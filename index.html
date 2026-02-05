@@ -269,25 +269,43 @@
         // Firebase初期化とグローバル変数
         let db, auth, appId;
 
-        // 初期化ロジックを関数化して再利用可能に
+        // 初期化ロジック (堅牢化)
         const initFirebase = () => {
             try {
-                if (typeof __firebase_config === 'undefined') {
-                    console.warn("Firebase config not ready yet.");
+                // 環境変数を安全に取得
+                const configRaw = (typeof __firebase_config !== 'undefined') ? __firebase_config : 
+                                  (typeof window !== 'undefined' && window.__firebase_config) ? window.__firebase_config : null;
+
+                if (!configRaw) {
+                    console.warn("Firebase config not found.");
                     return false;
                 }
-                const firebaseConfig = JSON.parse(__firebase_config);
+
+                // 文字列ならパース、オブジェクトならそのまま使う
+                let firebaseConfig;
+                try {
+                    firebaseConfig = (typeof configRaw === 'string') ? JSON.parse(configRaw) : configRaw;
+                } catch(e) {
+                    console.error("Config Parse Error:", e);
+                    window.showToast("設定パースエラー");
+                    return false;
+                }
+
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
-                appId = String((typeof __app_id !== 'undefined' && __app_id) ? __app_id : 'default-app-id');
+                
+                // App IDの取得
+                const appIdRaw = (typeof __app_id !== 'undefined') ? __app_id : 
+                                 (typeof window !== 'undefined' && window.__app_id) ? window.__app_id : 'default-app-id';
+                appId = String(appIdRaw);
                 
                 // 認証リスナーのセットアップ（初回のみ）
                 setupAuthListener();
                 return true;
             } catch(e) {
                 console.error("Firebase Init Error:", e);
-                window.showToast("システムエラー: 初期化失敗");
+                window.showToast("初期化エラー: " + (e.message || "不明"));
                 return false;
             }
         };
@@ -305,8 +323,12 @@
 
             const authLogic = async () => {
                 try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
+                    // グローバル変数のトークン取得も安全に
+                    const token = (typeof __initial_auth_token !== 'undefined') ? __initial_auth_token :
+                                  (typeof window !== 'undefined' && window.__initial_auth_token) ? window.__initial_auth_token : null;
+
+                    if (token) {
+                        await signInWithCustomToken(auth, token);
                     } else {
                         await signInAnonymously(auth);
                     }
@@ -483,19 +505,21 @@
                 // DBがない場合は再初期化を試みる
                 if (!db) {
                     const success = initFirebase();
-                    if(!success) throw new Error("データベース接続に失敗しました。ページを更新してください。");
+                    if(!success) throw new Error("データベース接続不可");
                 }
 
                 // 認証チェックと自動再接続
                 if (!auth.currentUser) {
-                    console.log("再認証を試みます...");
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
+                    const token = (typeof __initial_auth_token !== 'undefined') ? __initial_auth_token :
+                                  (typeof window !== 'undefined' && window.__initial_auth_token) ? window.__initial_auth_token : null;
+                    
+                    if (token) {
+                        await signInWithCustomToken(auth, token);
                     } else {
                         await signInAnonymously(auth);
                     }
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    if (!auth.currentUser) throw new Error("ログインできません。ネットワークを確認してください。");
+                    if (!auth.currentUser) throw new Error("ログイン不可");
                 }
                 
                 // 入力データの取得と正規化
@@ -532,7 +556,7 @@
             } catch (err) {
                 console.error("Error adding document: ", err);
                 let msg = "登録エラー";
-                if(err.code === 'permission-denied') msg = "保存権限がありません";
+                if(err.code === 'permission-denied') msg = "保存権限なし";
                 else if(err.message) msg = err.message;
                 window.showToast('登録失敗: ' + msg);
             } finally {
