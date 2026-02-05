@@ -266,14 +266,18 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase設定 (エラーハンドリング付き)
+        // Firebase設定 (エラーハンドリングとデフォルトチェック)
         let db, auth, appId;
         try {
+            if (typeof __firebase_config === 'undefined') {
+                throw new Error("Firebase設定が見つかりません。");
+            }
             const firebaseConfig = JSON.parse(__firebase_config);
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            // appIdを確実に文字列にする
+            appId = String((typeof __app_id !== 'undefined' && __app_id) ? __app_id : 'default-app-id');
         } catch(e) {
             console.error("Firebase Init Error:", e);
         }
@@ -309,7 +313,13 @@
         const scannerContainer = document.getElementById('scanner-container');
         const startScanBtn = document.getElementById('start-scan-btn');
 
-        /* --- 関数定義 --- */
+        /* --- ヘルパー関数 --- */
+        
+        // 要素から値を安全に取得
+        const getVal = (id) => {
+            const el = document.getElementById(id);
+            return (el && el.value) ? el.value : "";
+        };
 
         const stopScannerInternal = () => {
             if (isScanning) {
@@ -377,31 +387,31 @@
         };
 
         const openModalLocal = () => {
-            // 安全にスキャナーを停止
             try { stopScannerInternal(); } catch(e) {}
-
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modalContent.classList.remove('scale-95');
-                modalContent.classList.add('scale-100');
-            }, 10);
+            if(modal) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modalContent.classList.remove('scale-95');
+                    modalContent.classList.add('scale-100');
+                }, 10);
+            }
         };
 
         const closeModalLocal = () => {
             try { stopScannerInternal(); } catch(e) {}
-            
-            modal.classList.add('opacity-0');
-            modalContent.classList.remove('scale-100');
-            modalContent.classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
+            if(modal) {
+                modal.classList.add('opacity-0');
+                modalContent.classList.remove('scale-100');
+                modalContent.classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
         };
 
-        /* --- イベントリスナー設定 (DOMContentLoaded相当) --- */
+        /* --- イベントリスナー設定 --- */
         
-        // 静的ボタンへのリスナーアタッチ
         document.getElementById('register-btn').addEventListener('click', openModalLocal);
         document.getElementById('close-modal-btn').addEventListener('click', closeModalLocal);
         document.getElementById('cancel-btn').addEventListener('click', closeModalLocal);
@@ -412,7 +422,7 @@
         searchInput.addEventListener('input', renderBooks);
         filterStatus.addEventListener('change', renderBooks);
 
-        // 新規登録処理
+        // 新規登録処理（安全策強化版）
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const submitBtn = form.querySelector('button[type="submit"]');
@@ -421,53 +431,59 @@
             submitBtn.innerText = "登録中...";
 
             try {
-                if (!db) throw new Error("データベースが初期化されていません");
+                if (!db) throw new Error("データベース未接続: ページを再読み込みしてください");
 
-                // 認証チェックと再接続トライ
+                // 認証チェックと自動再接続
                 if (!auth.currentUser) {
-                    console.log("Re-authenticating...");
+                    console.log("再認証を試みます...");
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
                         await signInAnonymously(auth);
                     }
-                    // わずかに待つ
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    if (!auth.currentUser) throw new Error("ログインできませんでした。再読み込みしてください。");
+                    if (!auth.currentUser) throw new Error("ログインできません。ネットワークを確認してください。");
                 }
                 
-                // Firestoreは undefined を保存できないため、空文字などでガードする
-                // 各値を取得して文字列変換
-                const titleVal = document.getElementById('title').value;
-                const authorVal = document.getElementById('author').value;
-                const categoryVal = document.getElementById('category').value;
-                const dateVal = document.getElementById('purchaseDate').value;
-                const noteVal = document.getElementById('note').value;
-                const coverVal = document.getElementById('coverUrl').value;
+                // 入力データの取得と正規化（undefined/null排除）
+                const titleVal = getVal('title') || "無題";
+                const authorVal = getVal('author') || "不明";
+                const categoryVal = getVal('category') || "一般";
+                const dateVal = getVal('purchaseDate') || "";
+                const noteVal = getVal('note') || "";
+                const coverVal = getVal('coverUrl') || "";
 
                 const bookData = {
-                    title: titleVal ? String(titleVal) : "無題",
-                    author: authorVal ? String(authorVal) : "不明",
-                    category: categoryVal ? String(categoryVal) : "一般",
-                    date: dateVal ? String(dateVal) : "",
-                    note: noteVal ? String(noteVal) : "",
-                    coverUrl: coverVal ? String(coverVal) : "", 
+                    title: String(titleVal),
+                    author: String(authorVal),
+                    category: String(categoryVal),
+                    date: String(dateVal),
+                    note: String(noteVal),
+                    coverUrl: String(coverVal), 
                     status: 'available',
                     createdAt: Date.now()
                 };
 
+                // 保存実行
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'books'), bookData);
                 
+                // 成功時の処理
                 closeModalLocal();
                 form.reset();
-                document.getElementById('purchaseDate').valueAsDate = new Date();
-                document.getElementById('coverUrl').value = "";
-                document.getElementById('cover-preview').classList.add('hidden');
-                document.getElementById('cover-preview').src = "";
+                if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
+                if(document.getElementById('coverUrl')) document.getElementById('coverUrl').value = "";
+                if(document.getElementById('cover-preview')) {
+                    document.getElementById('cover-preview').classList.add('hidden');
+                    document.getElementById('cover-preview').src = "";
+                }
                 window.showToast('書籍を登録しました');
+
             } catch (err) {
                 console.error("Error adding document: ", err);
-                window.showToast('登録失敗: ' + (err.message || "不明なエラー"));
+                let msg = "登録エラー";
+                if(err.code === 'permission-denied') msg = "保存権限がありません";
+                else if(err.message) msg = err.message;
+                window.showToast('登録失敗: ' + msg);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerText = originalText;
@@ -485,6 +501,7 @@
                     }
                 } catch(e) {
                     console.error("Auth Init Error:", e);
+                    window.showToast("ログイン初期化エラー");
                 }
             };
             initAuth();
@@ -492,21 +509,24 @@
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     userId = user.uid;
-                    const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
-                    onSnapshot(q, (snapshot) => {
-                        books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        books.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                        renderBooks();
-                        updateStats();
-                    }, (error) => {
-                        console.error("Data Load Error:", error);
-                        // window.showToast("データの読み込みに失敗しました"); // 初期読み込みエラーは静かに
-                    });
+                    try {
+                        const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
+                        onSnapshot(q, (snapshot) => {
+                            books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            books.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                            renderBooks();
+                            updateStats();
+                        }, (error) => {
+                            console.error("Data Load Error:", error);
+                        });
+                    } catch(e) {
+                        console.error("Snapshot error:", e);
+                    }
                 }
             });
         }
 
-        document.getElementById('purchaseDate').valueAsDate = new Date();
+        if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
 
 
         /* --- 描画関数など --- */
@@ -645,30 +665,37 @@
         };
 
         window.toggleScanner = () => {
-             // 互換性のため残存（実際のボタンはJSで制御）
              if(isScanning) stopScannerInternal(); else startScannerInternal();
         };
 
         window.stopScanner = stopScannerInternal;
         
-        // 既存のHTML onclick対応 (バックワードコンパチビリティ)
+        // 互換性のため
         window.openModal = openModalLocal;
         window.closeModal = closeModalLocal;
 
         window.showToast = (message) => {
             const toast = document.getElementById('toast');
-            document.getElementById('toast-message').textContent = message;
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3000);
+            if(toast) {
+                document.getElementById('toast-message').textContent = message;
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }
         };
 
         window.fetchBookInfo = async (isbn) => {
             try {
-                document.getElementById('title').value = "情報を取得中...";
-                document.getElementById('author').value = "";
-                document.getElementById('note').value = isbn;
+                const titleEl = document.getElementById('title');
+                const authorEl = document.getElementById('author');
+                const noteEl = document.getElementById('note');
+                const coverUrlEl = document.getElementById('coverUrl');
+                const previewEl = document.getElementById('cover-preview');
+
+                if(titleEl) titleEl.value = "情報を取得中...";
+                if(authorEl) authorEl.value = "";
+                if(noteEl) noteEl.value = isbn;
 
                 let title = '';
                 let author = '';
@@ -707,25 +734,26 @@
                 }
 
                 if (found) {
-                    document.getElementById('title').value = title;
-                    document.getElementById('author').value = author;
-                    document.getElementById('coverUrl').value = coverUrl;
-                    const preview = document.getElementById('cover-preview');
-                    if (coverUrl) {
-                        preview.src = coverUrl;
-                        preview.classList.remove('hidden');
-                    } else {
-                        preview.classList.add('hidden');
-                        preview.src = '';
+                    if(titleEl) titleEl.value = title;
+                    if(authorEl) authorEl.value = author;
+                    if(coverUrlEl) coverUrlEl.value = coverUrl;
+                    
+                    if (coverUrl && previewEl) {
+                        previewEl.src = coverUrl;
+                        previewEl.classList.remove('hidden');
+                    } else if(previewEl) {
+                        previewEl.classList.add('hidden');
+                        previewEl.src = '';
                     }
                     window.showToast('書籍情報を自動入力しました');
                 } else {
-                    document.getElementById('title').value = "";
+                    if(titleEl) titleEl.value = "";
                     window.showToast('書籍情報が見つかりませんでした');
                 }
             } catch (error) {
                 console.error(error);
-                document.getElementById('title').value = "";
+                const titleEl = document.getElementById('title');
+                if(titleEl) titleEl.value = "";
                 window.showToast('情報取得エラーが発生しました');
             }
         };
