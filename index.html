@@ -424,26 +424,30 @@
             try {
                 if (!db) throw new Error("Database not initialized");
                 
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'books'), {
-                    title: document.getElementById('title').value,
-                    author: document.getElementById('author').value,
-                    category: document.getElementById('category').value,
-                    date: document.getElementById('purchaseDate').value,
-                    note: document.getElementById('note').value,
-                    coverUrl: document.getElementById('coverUrl').value, 
+                // Firestoreは undefined を保存できないため、空文字などでガードする
+                const bookData = {
+                    title: document.getElementById('title').value || "無題",
+                    author: document.getElementById('author').value || "不明",
+                    category: document.getElementById('category').value || "一般",
+                    date: document.getElementById('purchaseDate').value || "",
+                    note: document.getElementById('note').value || "",
+                    coverUrl: document.getElementById('coverUrl').value || "", 
                     status: 'available',
                     createdAt: Date.now()
-                });
+                };
+
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'books'), bookData);
                 
                 closeModalLocal();
                 form.reset();
                 document.getElementById('purchaseDate').valueAsDate = new Date();
                 document.getElementById('coverUrl').value = "";
                 document.getElementById('cover-preview').classList.add('hidden');
+                document.getElementById('cover-preview').src = ""; // srcもクリア
                 window.showToast('書籍を登録しました');
             } catch (err) {
                 console.error("Error adding document: ", err);
-                window.showToast('登録に失敗しました');
+                window.showToast('登録に失敗しました: ' + err.message);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerText = originalText;
