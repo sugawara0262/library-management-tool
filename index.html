@@ -266,26 +266,76 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase設定 (エラーハンドリングとデフォルトチェック)
+        // Firebase初期化とグローバル変数
         let db, auth, appId;
-        try {
-            if (typeof __firebase_config === 'undefined') {
-                throw new Error("Firebase設定が見つかりません。");
+
+        // 初期化ロジックを関数化して再利用可能に
+        const initFirebase = () => {
+            try {
+                if (typeof __firebase_config === 'undefined') {
+                    console.warn("Firebase config not ready yet.");
+                    return false;
+                }
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                appId = String((typeof __app_id !== 'undefined' && __app_id) ? __app_id : 'default-app-id');
+                
+                // 認証リスナーのセットアップ（初回のみ）
+                setupAuthListener();
+                return true;
+            } catch(e) {
+                console.error("Firebase Init Error:", e);
+                window.showToast("システムエラー: 初期化失敗");
+                return false;
             }
-            const firebaseConfig = JSON.parse(__firebase_config);
-            const app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-            // appIdを確実に文字列にする
-            appId = String((typeof __app_id !== 'undefined' && __app_id) ? __app_id : 'default-app-id');
-        } catch(e) {
-            console.error("Firebase Init Error:", e);
-        }
+        };
 
         // 状態変数
         let books = [];
         let userId = null;
         let isScanning = false;
+        let authListenerSetup = false;
+
+        // 認証リスナーセットアップ
+        const setupAuthListener = () => {
+            if (authListenerSetup || !auth) return;
+            authListenerSetup = true;
+
+            const authLogic = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch(e) {
+                    console.error("Auth Error:", e);
+                }
+            };
+            authLogic();
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    try {
+                        const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
+                        onSnapshot(q, (snapshot) => {
+                            books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            books.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                            renderBooks();
+                            updateStats();
+                        }, (error) => {
+                            console.error("Data Load Error:", error);
+                        });
+                    } catch(e) { console.error("Snapshot error:", e); }
+                }
+            });
+        };
+
+        // 初回実行
+        initFirebase();
 
         // 状態定義
         const statusConfig = {
@@ -315,7 +365,6 @@
 
         /* --- ヘルパー関数 --- */
         
-        // 要素から値を安全に取得
         const getVal = (id) => {
             const el = document.getElementById(id);
             return (el && el.value) ? el.value : "";
@@ -431,7 +480,11 @@
             submitBtn.innerText = "登録中...";
 
             try {
-                if (!db) throw new Error("データベース未接続: ページを再読み込みしてください");
+                // DBがない場合は再初期化を試みる
+                if (!db) {
+                    const success = initFirebase();
+                    if(!success) throw new Error("データベース接続に失敗しました。ページを更新してください。");
+                }
 
                 // 認証チェックと自動再接続
                 if (!auth.currentUser) {
@@ -445,7 +498,7 @@
                     if (!auth.currentUser) throw new Error("ログインできません。ネットワークを確認してください。");
                 }
                 
-                // 入力データの取得と正規化（undefined/null排除）
+                // 入力データの取得と正規化
                 const titleVal = getVal('title') || "無題";
                 const authorVal = getVal('author') || "不明";
                 const categoryVal = getVal('category') || "一般";
@@ -464,10 +517,8 @@
                     createdAt: Date.now()
                 };
 
-                // 保存実行
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'books'), bookData);
                 
-                // 成功時の処理
                 closeModalLocal();
                 form.reset();
                 if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
@@ -489,42 +540,6 @@
                 submitBtn.innerText = originalText;
             }
         });
-
-        /* --- 認証と初期化 --- */
-        if (auth) {
-            const initAuth = async () => {
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch(e) {
-                    console.error("Auth Init Error:", e);
-                    window.showToast("ログイン初期化エラー");
-                }
-            };
-            initAuth();
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    userId = user.uid;
-                    try {
-                        const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
-                        onSnapshot(q, (snapshot) => {
-                            books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            books.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                            renderBooks();
-                            updateStats();
-                        }, (error) => {
-                            console.error("Data Load Error:", error);
-                        });
-                    } catch(e) {
-                        console.error("Snapshot error:", e);
-                    }
-                }
-            });
-        }
 
         if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
 
