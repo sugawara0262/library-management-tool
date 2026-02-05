@@ -158,7 +158,7 @@
                     <option value="lost">不明・廃棄</option>
                 </select>
                 
-                <button id="register-btn" class="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-md transition-all transform active:scale-95 whitespace-nowrap ml-auto md:ml-0">
+                <button id="register-btn" onclick="window.openModal()" class="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-md transition-all transform active:scale-95 whitespace-nowrap ml-auto md:ml-0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     書籍登録
                 </button>
@@ -185,14 +185,14 @@
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh]" id="modal-content">
             <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl flex-shrink-0">
                 <h3 class="text-xl font-bold text-slate-700">新しい書籍を登録</h3>
-                <button id="close-modal-btn" class="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onclick="window.closeModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
             
             <div class="overflow-y-auto p-6 space-y-5">
                 <!-- スキャナー起動ボタン -->
-                <button type="button" id="start-scan-btn" class="w-full py-3 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 hover:border-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-2">
+                <button type="button" onclick="window.toggleScanner()" id="start-scan-btn" class="w-full py-3 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 hover:border-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
                     <span class="font-medium">バーコード(ISBN)を読み取る</span>
                 </button>
@@ -204,7 +204,7 @@
                         <div class="scan-overlay"></div>
                     </div>
                     <p class="text-center text-xs text-slate-400 mb-2">赤い枠内にバーコードを合わせてください</p>
-                    <button type="button" id="stop-scan-btn" class="w-full py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg">カメラを閉じる</button>
+                    <button type="button" onclick="window.stopScanner()" class="w-full py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg">カメラを閉じる</button>
                 </div>
 
                 <form id="add-book-form" class="space-y-5">
@@ -254,7 +254,7 @@
                     </div>
 
                     <div class="flex gap-3 pt-2">
-                        <button type="button" id="cancel-btn" class="flex-1 px-4 py-3 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors">キャンセル</button>
+                        <button type="button" onclick="window.closeModal()" class="flex-1 px-4 py-3 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors">キャンセル</button>
                         <button type="submit" class="flex-1 px-4 py-3 rounded-lg bg-slate-700 text-white font-medium hover:bg-slate-800 shadow-md transition-all active:scale-95">登録する</button>
                     </div>
                 </form>
@@ -281,6 +281,24 @@
         
         let books = [];
         let isScanning = false;
+
+        // 定数定義
+        const statusConfig = {
+            available: { label: '貸出可能', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+            lent: { label: '貸出中', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+            lost: { label: '不明・廃棄', color: 'bg-slate-100 text-slate-500 border-slate-200' }
+        };
+
+        const categoryColors = {
+            '一般': 'bg-blue-50 text-blue-600',
+            '専門書': 'bg-purple-50 text-purple-600',
+            '雑誌': 'bg-pink-50 text-pink-600',
+            '児童書': 'bg-orange-50 text-orange-600',
+            'その他': 'bg-gray-50 text-gray-600'
+        };
+
+        // DOM要素
+        let grid, searchInput, filterStatus, modal, modalContent, form, emptyState, scannerContainer, startScanBtn;
 
         // Firebase初期化 (安全策: 失敗してもアプリを止めない)
         const initFirebase = () => {
@@ -311,7 +329,8 @@
 
         const enableOfflineMode = () => {
             isOfflineMode = true;
-            document.getElementById('connection-status').classList.remove('hidden');
+            const statusBadge = document.getElementById('connection-status');
+            if (statusBadge) statusBadge.classList.remove('hidden');
             window.showToast("データベース接続失敗: オフラインモードで起動します");
             
             // ダミーデータ（動作確認用）
@@ -355,35 +374,6 @@
                 }
             });
         };
-
-        // 実行開始
-        initFirebase();
-
-        // 状態定義
-        const statusConfig = {
-            available: { label: '貸出可能', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-            lent: { label: '貸出中', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-            lost: { label: '不明・廃棄', color: 'bg-slate-100 text-slate-500 border-slate-200' }
-        };
-
-        const categoryColors = {
-            '一般': 'bg-blue-50 text-blue-600',
-            '専門書': 'bg-purple-50 text-purple-600',
-            '雑誌': 'bg-pink-50 text-pink-600',
-            '児童書': 'bg-orange-50 text-orange-600',
-            'その他': 'bg-gray-50 text-gray-600'
-        };
-
-        // DOM要素
-        const grid = document.getElementById('book-grid');
-        const searchInput = document.getElementById('search-input');
-        const filterStatus = document.getElementById('filter-status');
-        const modal = document.getElementById('modal');
-        const modalContent = document.getElementById('modal-content');
-        const form = document.getElementById('add-book-form');
-        const emptyState = document.getElementById('empty-state');
-        const scannerContainer = document.getElementById('scanner-container');
-        const startScanBtn = document.getElementById('start-scan-btn');
 
         /* --- ヘルパー関数 --- */
         const getVal = (id) => {
@@ -479,17 +469,8 @@
             }
         };
 
-        /* --- イベントリスナー --- */
-        document.getElementById('register-btn').addEventListener('click', openModalLocal);
-        document.getElementById('close-modal-btn').addEventListener('click', closeModalLocal);
-        document.getElementById('cancel-btn').addEventListener('click', closeModalLocal);
-        startScanBtn.addEventListener('click', startScannerInternal);
-        document.getElementById('stop-scan-btn').addEventListener('click', stopScannerInternal);
-        searchInput.addEventListener('input', renderBooks);
-        filterStatus.addEventListener('change', renderBooks);
-
-        // 新規登録処理（オフライン対応版）
-        form.addEventListener('submit', async (e) => {
+        /* --- フォーム送信 --- */
+        const handleFormSubmit = async (e) => {
             e.preventDefault();
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerText;
@@ -509,14 +490,12 @@
                 };
 
                 if (isOfflineMode || !db) {
-                    // オフラインモード: メモリに追加
                     bookData.id = 'temp-' + Date.now();
                     books.unshift(bookData);
                     renderBooks();
                     updateStats();
-                    window.showToast('【オフライン】一時的に登録しました（保存されません）');
+                    window.showToast('【オフライン】一時的に登録しました');
                 } else {
-                    // オンラインモード: Firestoreに追加
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'books'), bookData);
                     window.showToast('書籍を登録しました');
                 }
@@ -537,15 +516,14 @@
                 submitBtn.disabled = false;
                 submitBtn.innerText = originalText;
             }
-        });
-
-        if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
+        };
 
         /* --- 描画関数 --- */
         function renderBooks() {
+            if(!grid) return;
             grid.innerHTML = '';
-            const query = searchInput.value.toLowerCase();
-            const statusFilter = filterStatus.value;
+            const query = searchInput ? searchInput.value.toLowerCase() : '';
+            const statusFilter = filterStatus ? filterStatus.value : 'all';
 
             const filteredBooks = books.filter(book => {
                 const title = book.title ? String(book.title).toLowerCase() : '';
@@ -557,11 +535,15 @@
             });
 
             if (filteredBooks.length === 0) {
-                emptyState.classList.remove('hidden');
-                emptyState.classList.add('flex');
+                if(emptyState) {
+                    emptyState.classList.remove('hidden');
+                    emptyState.classList.add('flex');
+                }
             } else {
-                emptyState.classList.add('hidden');
-                emptyState.classList.remove('flex');
+                if(emptyState) {
+                    emptyState.classList.add('hidden');
+                    emptyState.classList.remove('flex');
+                }
             }
 
             filteredBooks.forEach(book => {
@@ -613,6 +595,7 @@
         }
 
         function updateStats() {
+            if(!document.getElementById('total-books')) return;
             document.getElementById('total-books').textContent = books.length;
             document.getElementById('available-books').textContent = books.filter(b => b.status === 'available').length;
             document.getElementById('lent-books').textContent = books.filter(b => b.status === 'lent').length;
@@ -770,6 +753,32 @@
                 window.showToast('情報取得エラーが発生しました');
             }
         };
+
+        // 初期化実行 (ロード完了後)
+        const initializeDOM = () => {
+            grid = document.getElementById('book-grid');
+            searchInput = document.getElementById('search-input');
+            filterStatus = document.getElementById('filter-status');
+            modal = document.getElementById('modal');
+            modalContent = document.getElementById('modal-content');
+            form = document.getElementById('add-book-form');
+            emptyState = document.getElementById('empty-state');
+            scannerContainer = document.getElementById('scanner-container');
+            startScanBtn = document.getElementById('start-scan-btn');
+
+            if(searchInput) searchInput.addEventListener('input', renderBooks);
+            if(filterStatus) filterStatus.addEventListener('change', renderBooks);
+            if(form) form.addEventListener('submit', handleFormSubmit);
+            if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
+
+            initFirebase();
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeDOM);
+        } else {
+            initializeDOM();
+        }
 
     </script>
 </body>
