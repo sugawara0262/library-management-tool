@@ -104,10 +104,10 @@
             </div>
             
             <div class="overflow-y-auto p-6 space-y-5">
-                <!-- スキャナー起動ボタン -->
-                <button type="button" onclick="window.toggleScanner()" id="start-scan-btn" class="w-full py-3 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 hover:border-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
-                    <span class="font-medium">バーコード(ISBN)を読み取る</span>
+                <!-- 1. スキャナー起動ボタン (メイン) -->
+                <button type="button" onclick="window.toggleScanner()" id="start-scan-btn" class="w-full py-4 rounded-lg border-2 border-dashed border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+                    <span class="font-bold text-lg">バーコードをスキャンして自動入力</span>
                 </button>
 
                 <!-- スキャナーエリア -->
@@ -116,20 +116,27 @@
                     <p class="text-center text-xs text-slate-400 mb-2">赤い枠内にバーコードを合わせてください</p>
                     <button type="button" onclick="window.stopScanner()" class="w-full py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg">カメラを閉じる</button>
                 </div>
+                
+                <!-- 2. 手動入力切り替え (サブ) -->
+                <div class="text-center">
+                    <button type="button" onclick="document.getElementById('manual-isbn-area').classList.toggle('hidden');" class="text-xs text-slate-400 hover:text-slate-600 underline decoration-dashed">
+                        スキャンできない場合はこちら (ISBN手動入力)
+                    </button>
+                </div>
 
-                <!-- 手動ISBN入力エリア -->
-                <div class="flex gap-2 items-end">
+                <!-- 手動ISBN入力エリア (デフォルト非表示) -->
+                <div id="manual-isbn-area" class="hidden flex gap-2 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
                     <div class="relative flex-grow">
                         <input type="text" id="isbn-input" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="ISBN" onkeypress="if(event.key === 'Enter'){event.preventDefault(); window.manualSearch();}">
-                        <label for="isbn-input" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN (978...)</label>
+                        <label for="isbn-input" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN (例: 978...)</label>
                     </div>
-                    <button type="button" onclick="window.manualSearch()" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium transition-colors">
+                    <button type="button" onclick="window.manualSearch()" class="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors">
                         検索
                     </button>
                 </div>
 
-                <form id="add-book-form" class="space-y-5">
-                    <!-- 表紙画像プレビューエリア (手動入力機能付き) -->
+                <form id="add-book-form" class="space-y-5 border-t border-slate-100 pt-5">
+                    <!-- 表紙画像プレビューエリア -->
                     <div class="flex flex-col items-center justify-center mb-4">
                         <div class="relative h-40 w-full flex items-center justify-center bg-slate-50 rounded-lg border border-slate-200 mb-2 overflow-hidden">
                             <img id="cover-preview" src="" alt="表紙プレビュー" class="hidden h-full object-contain z-10 bg-white" onerror="this.classList.add('hidden'); document.getElementById('no-image-preview').classList.remove('hidden');">
@@ -138,12 +145,11 @@
                                 <span class="text-xs">No Image</span>
                             </div>
                         </div>
-                        <button type="button" onclick="document.getElementById('manual-cover-input').classList.toggle('hidden'); setTimeout(() => document.getElementById('coverUrl-input').focus(), 100);" class="text-xs text-blue-500 hover:underline">
-                            画像が見つからない場合はこちら
+                        <button type="button" onclick="document.getElementById('manual-cover-input').classList.toggle('hidden');" class="text-xs text-blue-500 hover:underline">
+                            画像URLを手動設定
                         </button>
                         <div id="manual-cover-input" class="hidden w-full mt-2">
                             <input type="text" id="coverUrl-input" class="w-full px-3 py-2 text-sm rounded border border-slate-300 focus:outline-none focus:border-blue-500" placeholder="https://example.com/image.jpg" onchange="window.updateCoverPreview(this.value)">
-                            <p class="text-[10px] text-gray-400 mt-1">※Amazon等の画像URLを貼り付けてください</p>
                         </div>
                     </div>
                     
@@ -156,7 +162,7 @@
                         <div class="relative"><select id="category" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors bg-white text-slate-700"><option value="一般">一般</option><option value="専門書">専門書</option><option value="雑誌">雑誌</option><option value="児童書">児童書</option><option value="その他">その他</option></select><label class="absolute left-3 -top-2.5 bg-white px-1 text-xs text-slate-500">カテゴリ</label></div>
                         <div class="relative"><input type="date" id="purchaseDate" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors text-slate-700"><label class="absolute left-3 -top-2.5 bg-white px-1 text-xs text-slate-500">購入日</label></div>
                     </div>
-                    <div class="relative"><textarea id="note" rows="2" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="備考"></textarea><label for="note" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">備考</label></div>
+                    <div class="relative"><textarea id="note" rows="2" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="備考"></textarea><label for="note" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">備考 (ISBN等)</label></div>
                     <div class="flex gap-3 pt-2">
                         <button type="button" onclick="window.closeModal()" class="flex-1 px-4 py-3 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors">キャンセル</button>
                         <button type="submit" class="flex-1 px-4 py-3 rounded-lg bg-slate-700 text-white font-medium hover:bg-slate-800 shadow-md transition-all active:scale-95">登録する</button>
@@ -371,11 +377,11 @@
                 window.showToast("正しいISBNを入力してください");
             }
         };
-
+        
+        // 手動画像URL設定用
         window.updateCoverPreview = (url) => {
              const preview = document.getElementById('cover-preview');
              const noImage = document.getElementById('no-image-preview');
-             // hiddenのinputも更新
              document.getElementById('coverUrl').value = url;
              
              if(url) {
@@ -403,6 +409,7 @@
             document.getElementById('coverUrl').value = "";
             document.getElementById('coverUrl-input').value = "";
             document.getElementById('manual-cover-input').classList.add('hidden');
+            document.getElementById('manual-isbn-area').classList.add('hidden');
         };
 
         window.closeModal = () => {
@@ -536,7 +543,6 @@
                     } else {
                         // 画像が見つからない場合
                         noImage.classList.remove('hidden');
-                        // 手動入力エリアを自動展開
                         manualInput.classList.remove('hidden');
                         document.getElementById('coverUrl-input').focus();
                         window.showToast('画像が見つかりませんでした。手動で設定できます。');
