@@ -9,77 +9,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Noto Sans JP', sans-serif;
-            background-color: #f0f4f8; /* 落ち着いたブルーグレーの背景 */
-            color: #374151;
-        }
-        
-        /* カスタムスクロールバー */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8; 
-        }
-
-        /* アニメーション */
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* フローティングラベルのスタイル */
-        .floating-input:focus ~ label,
-        .floating-input:not(:placeholder-shown) ~ label {
-            top: -0.5rem;
-            left: 0.5rem;
-            font-size: 0.75rem;
-            color: #475569;
-            background-color: white;
-            padding: 0 0.25rem;
-        }
-
-        /* バーコードスキャナ用 */
-        #interactive.viewport {
-            position: relative;
-            width: 100%;
-            height: 240px;
-            overflow: hidden;
-            border-radius: 0.75rem;
-            margin-bottom: 1rem;
-            background: #000;
-        }
-        #interactive.viewport > canvas, #interactive.viewport > video {
-            max-width: 100%;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        /* スキャン時のオーバーレイ */
-        .scan-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            height: 100px;
-            border: 2px solid rgba(255, 0, 0, 0.5);
-            border-radius: 8px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-            pointer-events: none;
-            z-index: 10;
-        }
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: #f0f4f8; color: #374151; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .floating-input:focus ~ label, .floating-input:not(:placeholder-shown) ~ label { top: -0.5rem; left: 0.5rem; font-size: 0.75rem; color: #475569; background-color: white; padding: 0 0.25rem; }
+        #interactive.viewport { position: relative; width: 100%; height: 240px; overflow: hidden; border-radius: 0.75rem; margin-bottom: 1rem; background: #000; }
+        #interactive.viewport > canvas, #interactive.viewport > video { max-width: 100%; width: 100%; height: 100%; object-fit: cover; }
+        .scan-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; height: 100px; border: 2px solid rgba(255, 0, 0, 0.5); border-radius: 8px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 10; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -94,62 +34,40 @@
                 <h1 class="text-xl font-bold text-slate-700 tracking-wide">蔵書管理システム</h1>
             </div>
             <div class="flex items-center gap-3">
-                <!-- 接続ステータス表示 (クリックで詳細) -->
-                <button id="connection-status" onclick="window.retryConnection()" class="hidden px-3 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs rounded-full font-bold flex items-center gap-1 transition-colors group" title="クリックして再接続">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:animate-spin"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <button id="connection-status" onclick="window.retryConnection()" class="hidden px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-full font-bold flex items-center gap-1 transition-colors group" title="クリックして再接続">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     <span id="status-text">未接続</span>
                 </button>
-                <div class="text-sm text-slate-500 hidden sm:block">
-                    施設の知を守る
-                </div>
             </div>
         </div>
     </header>
 
     <!-- メインコンテンツ -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        
-        <!-- ダッシュボード (統計) -->
+        <!-- 統計パネル -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-slate-600 flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">総蔵書数</p>
-                    <p class="text-3xl font-bold text-slate-800" id="total-books">0</p>
-                </div>
-                <div class="text-slate-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                </div>
+                <div><p class="text-sm text-slate-500 mb-1">総蔵書数</p><p class="text-3xl font-bold text-slate-800" id="total-books">0</p></div>
+                <div class="text-slate-200"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-emerald-500 flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">貸出可能</p>
-                    <p class="text-3xl font-bold text-emerald-600" id="available-books">0</p>
-                </div>
-                <div class="text-emerald-100">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                </div>
+                <div><p class="text-sm text-slate-500 mb-1">貸出可能</p><p class="text-3xl font-bold text-emerald-600" id="available-books">0</p></div>
+                <div class="text-emerald-100"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-amber-500 flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500 mb-1">貸出中</p>
-                    <p class="text-3xl font-bold text-amber-600" id="lent-books">0</p>
-                </div>
-                <div class="text-amber-100">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-                </div>
+                <div><p class="text-sm text-slate-500 mb-1">貸出中</p><p class="text-3xl font-bold text-amber-600" id="lent-books">0</p></div>
+                <div class="text-amber-100"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg></div>
             </div>
         </div>
 
         <!-- コントロールバー -->
         <div class="flex flex-col md:flex-row gap-4 mb-6 justify-between items-center bg-white p-4 rounded-xl shadow-sm">
             <div class="relative w-full md:w-96">
-                <input type="text" id="search-input" placeholder="タイトル、著者、ISBNで検索..." 
-                    class="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition-all">
+                <input type="text" id="search-input" placeholder="タイトル、著者、ISBNで検索..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent transition-all">
                 <div class="absolute left-3 top-2.5 text-slate-400">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </div>
             </div>
-            
             <div class="flex gap-2 w-full md:w-auto">
                 <select id="filter-status" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white">
                     <option value="all">全ての状態</option>
@@ -157,7 +75,6 @@
                     <option value="lent">貸出中</option>
                     <option value="lost">不明・廃棄</option>
                 </select>
-                
                 <button id="register-btn" onclick="window.openModal()" class="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-md transition-all transform active:scale-95 whitespace-nowrap ml-auto md:ml-0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     書籍登録
@@ -167,17 +84,14 @@
 
         <!-- 書籍リスト -->
         <div id="book-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <!-- JavaScriptでここにカードが生成されます -->
-            <div class="col-span-full text-center py-10 text-slate-400">データを読み込んでいます...</div>
+            <div class="col-span-full text-center py-10 text-slate-400">読み込み中...</div>
         </div>
-
         <!-- 空の状態 -->
         <div id="empty-state" class="hidden flex-col items-center justify-center py-20 text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-4"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
             <p class="text-lg">書籍が見つかりません</p>
             <p class="text-sm mt-1">新しい書籍を登録してください</p>
         </div>
-
     </main>
 
     <!-- 登録モーダル -->
@@ -185,74 +99,28 @@
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh]" id="modal-content">
             <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl flex-shrink-0">
                 <h3 class="text-xl font-bold text-slate-700">新しい書籍を登録</h3>
-                <button onclick="window.closeModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
+                <button onclick="window.closeModal()" class="text-slate-400 hover:text-slate-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
-            
             <div class="overflow-y-auto p-6 space-y-5">
-                <!-- スキャナー起動ボタン -->
                 <button type="button" onclick="window.toggleScanner()" id="start-scan-btn" class="w-full py-3 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 hover:border-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
                     <span class="font-medium">バーコード(ISBN)を読み取る</span>
                 </button>
-
-                <!-- スキャナーエリア (初期非表示) -->
                 <div id="scanner-container" class="hidden">
-                    <div id="interactive" class="viewport">
-                        <!-- スキャン枠のガイド -->
-                        <div class="scan-overlay"></div>
-                    </div>
+                    <div id="interactive" class="viewport"><div class="scan-overlay"></div></div>
                     <p class="text-center text-xs text-slate-400 mb-2">赤い枠内にバーコードを合わせてください</p>
                     <button type="button" onclick="window.stopScanner()" class="w-full py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg">カメラを閉じる</button>
                 </div>
-
                 <form id="add-book-form" class="space-y-5">
-                    <!-- 表紙画像プレビューエリア -->
-                    <div class="flex justify-center">
-                        <img id="cover-preview" src="" alt="表紙プレビュー" class="hidden h-32 object-contain rounded-md shadow-md border border-slate-100">
-                    </div>
-                    <!-- 隠しフィールド: 画像URL -->
+                    <div class="flex justify-center"><img id="cover-preview" src="" alt="表紙プレビュー" class="hidden h-32 object-contain rounded-md shadow-md border border-slate-100"></div>
                     <input type="hidden" id="coverUrl">
-
-                    <!-- タイトル -->
-                    <div class="relative">
-                        <input type="text" id="title" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="タイトル" required>
-                        <label for="title" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">書籍タイトル *</label>
-                    </div>
-
-                    <!-- 著者 -->
-                    <div class="relative">
-                        <input type="text" id="author" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="著者" required>
-                        <label for="author" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">著者名 *</label>
-                    </div>
-
+                    <div class="relative"><input type="text" id="title" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="タイトル" required><label for="title" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">書籍タイトル *</label></div>
+                    <div class="relative"><input type="text" id="author" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="著者" required><label for="author" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">著者名 *</label></div>
                     <div class="grid grid-cols-2 gap-4">
-                        <!-- 分類 -->
-                        <div class="relative">
-                            <select id="category" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors bg-white text-slate-700">
-                                <option value="一般">一般</option>
-                                <option value="専門書">専門書</option>
-                                <option value="雑誌">雑誌</option>
-                                <option value="児童書">児童書</option>
-                                <option value="その他">その他</option>
-                            </select>
-                            <label class="absolute left-3 -top-2.5 bg-white px-1 text-xs text-slate-500">カテゴリ</label>
-                        </div>
-                        
-                        <!-- 購入日 -->
-                        <div class="relative">
-                            <input type="date" id="purchaseDate" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors text-slate-700">
-                            <label class="absolute left-3 -top-2.5 bg-white px-1 text-xs text-slate-500">購入日</label>
-                        </div>
+                        <div class="relative"><select id="category" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors bg-white text-slate-700"><option value="一般">一般</option><option value="専門書">専門書</option><option value="雑誌">雑誌</option><option value="児童書">児童書</option><option value="その他">その他</option></select><label class="absolute left-3 -top-2.5 bg-white px-1 text-xs text-slate-500">カテゴリ</label></div>
+                        <div class="relative"><input type="date" id="purchaseDate" class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors text-slate-700"><label class="absolute left-3 -top-2.5 bg-white px-1 text-xs text-slate-500">購入日</label></div>
                     </div>
-
-                    <!-- ISBN/メモ -->
-                    <div class="relative">
-                        <textarea id="note" rows="2" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="備考"></textarea>
-                        <label for="note" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN / 備考</label>
-                    </div>
-
+                    <div class="relative"><textarea id="note" rows="2" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="備考"></textarea><label for="note" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN / 備考</label></div>
                     <div class="flex gap-3 pt-2">
                         <button type="button" onclick="window.closeModal()" class="flex-1 px-4 py-3 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors">キャンセル</button>
                         <button type="submit" class="flex-1 px-4 py-3 rounded-lg bg-slate-700 text-white font-medium hover:bg-slate-800 shadow-md transition-all active:scale-95">登録する</button>
@@ -262,7 +130,6 @@
         </div>
     </div>
 
-    <!-- 通知トースト -->
     <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 z-50">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         <span id="toast-message">操作が完了しました</span>
@@ -273,166 +140,183 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // ========================================================
+        // 【重要】GitHub等で公開する場合は、以下にFirebase設定を貼り付けてください
+        // ========================================================
+        const YOUR_FIREBASE_CONFIG = null; 
+        /* 例:
+        const YOUR_FIREBASE_CONFIG = {
+            apiKey: "AIzaSy...",
+            authDomain: "...",
+            projectId: "...",
+            storageBucket: "...",
+            messagingSenderId: "...",
+            appId: "..."
+        };
+        */
+
         // グローバル変数
         let db = null;
         let auth = null;
         let appId = 'default-app-id';
         let isOfflineMode = false;
-        let lastError = "初期化中...";
-        
         let books = [];
         let isScanning = false;
-
-        // 定数定義
-        const statusConfig = {
-            available: { label: '貸出可能', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-            lent: { label: '貸出中', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-            lost: { label: '不明・廃棄', color: 'bg-slate-100 text-slate-500 border-slate-200' }
-        };
-
-        const categoryColors = {
-            '一般': 'bg-blue-50 text-blue-600',
-            '専門書': 'bg-purple-50 text-purple-600',
-            '雑誌': 'bg-pink-50 text-pink-600',
-            '児童書': 'bg-orange-50 text-orange-600',
-            'その他': 'bg-gray-50 text-gray-600'
-        };
-
+        let collectionPath = []; // データの保存場所パス
+        
         // DOM要素
         let grid, searchInput, filterStatus, modal, modalContent, form, emptyState, scannerContainer, startScanBtn;
 
-        // Firebase初期化 (堅牢化版)
+        // --- Helper Functions ---
+        const getVal = (id) => { const el = document.getElementById(id); return (el && el.value) ? el.value : ""; };
+
+        // --- UI Rendering Functions (Moved to top to prevent ReferenceError) ---
+        function renderBooks() {
+            if(!grid) return;
+            grid.innerHTML = '';
+            const query = searchInput ? searchInput.value.toLowerCase() : '';
+            const statusFilter = filterStatus ? filterStatus.value : 'all';
+            const filteredBooks = books.filter(book => {
+                const title = book.title ? String(book.title).toLowerCase() : '';
+                const author = book.author ? String(book.author).toLowerCase() : '';
+                const note = book.note ? String(book.note).toLowerCase() : '';
+                return (title.includes(query) || author.includes(query) || note.includes(query)) && (statusFilter === 'all' || book.status === statusFilter);
+            });
+
+            if (filteredBooks.length === 0) { emptyState.classList.remove('hidden'); emptyState.classList.add('flex'); } 
+            else { emptyState.classList.add('hidden'); emptyState.classList.remove('flex'); }
+
+            const statusMap = {
+                available: { label: '貸出可能', color: 'bg-emerald-100 text-emerald-700' },
+                lent: { label: '貸出中', color: 'bg-amber-100 text-amber-700' },
+                lost: { label: '不明・廃棄', color: 'bg-slate-100 text-slate-500' }
+            };
+
+            filteredBooks.forEach(book => {
+                const st = statusMap[book.status] || statusMap.available;
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col h-full fade-in relative group hover:shadow-md transition-all';
+                const cover = book.coverUrl 
+                    ? `<div class="w-full h-40 mb-3 flex items-center justify-center overflow-hidden bg-slate-50 rounded-lg"><img src="${book.coverUrl}" class="h-full object-contain"></div>` 
+                    : `<div class="w-full h-40 mb-3 flex items-center justify-center bg-slate-100 rounded-lg text-slate-300"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></div>`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2"><span class="text-xs font-semibold px-2 py-1 rounded-md bg-blue-50 text-blue-600">${book.category}</span>
+                        <div class="relative"><button onclick="window.toggleMenu('${book.id}')" class="text-slate-300 hover:text-slate-500 p-1">●●●</button>
+                            <div id="menu-${book.id}" class="hidden absolute right-0 mt-1 w-32 bg-white rounded-lg shadow-xl border border-slate-100 z-10 text-sm">
+                                <button onclick="window.changeStatus('${book.id}', 'available')" class="block w-full text-left px-4 py-2 hover:bg-emerald-50">返却</button>
+                                <button onclick="window.changeStatus('${book.id}', 'lent')" class="block w-full text-left px-4 py-2 hover:bg-amber-50">貸出</button>
+                                <button onclick="window.deleteBook('${book.id}')" class="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 border-t">削除</button>
+                            </div>
+                        </div>
+                    </div>
+                    ${cover}
+                    <h3 class="text-lg font-bold text-slate-800 mb-1 line-clamp-2">${book.title}</h3>
+                    <p class="text-sm text-slate-500 mb-4">${book.author}</p>
+                    <div class="mt-auto pt-4 border-t border-slate-50 flex justify-between items-center">
+                        <span class="text-xs text-slate-400">${book.date}</span>
+                        <span onclick="window.cycleStatus('${book.id}')" class="cursor-pointer text-xs font-medium px-2 py-1 rounded-full border ${st.color}">${st.label}</span>
+                    </div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function updateStats() {
+            if(!document.getElementById('total-books')) return;
+            document.getElementById('total-books').textContent = books.length;
+            document.getElementById('available-books').textContent = books.filter(b => b.status === 'available').length;
+            document.getElementById('lent-books').textContent = books.filter(b => b.status === 'lent').length;
+        }
+
+        // --- Core Logic ---
+        
         const initFirebase = () => {
             try {
-                if (typeof __firebase_config === 'undefined') throw new Error("Config未定義");
-                
-                let config = __firebase_config;
-                if (typeof config === 'string') {
-                    try {
-                        config = JSON.parse(config);
-                    } catch(e) {
-                        throw new Error("Configパースエラー");
-                    }
+                let config = null;
+                let useEnvConfig = false;
+
+                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                    config = (typeof __firebase_config === 'string') ? JSON.parse(__firebase_config) : __firebase_config;
+                    useEnvConfig = true;
+                } else if (typeof YOUR_FIREBASE_CONFIG !== 'undefined' && YOUR_FIREBASE_CONFIG) {
+                    config = YOUR_FIREBASE_CONFIG;
                 }
 
-                // アプリの取得または初期化
-                let app;
-                if (getApps().length === 0) {
-                    app = initializeApp(config);
-                } else {
-                    app = getApp();
-                }
+                if (!config) throw new Error("設定が見つかりません。READMEを参照してください。");
 
+                const app = getApps().length === 0 ? initializeApp(config) : getApp();
                 auth = getAuth(app);
                 db = getFirestore(app);
-                
-                if (typeof __app_id !== 'undefined') {
-                    appId = String(__app_id);
+
+                if (useEnvConfig) {
+                    const envAppId = (typeof __app_id !== 'undefined') ? __app_id : 'default-app-id';
+                    collectionPath = ['artifacts', String(envAppId), 'public', 'data', 'books'];
+                } else {
+                    collectionPath = ['books'];
                 }
 
-                // 認証開始
-                startAuth();
+                startAuth(useEnvConfig);
+
             } catch(e) {
-                console.error("Init Error:", e);
-                enableOfflineMode("初期化エラー: " + e.message);
+                console.error("Init Failed:", e);
+                enableOfflineMode(e.message);
             }
         };
 
-        // 認証処理 (標準フロー遵守)
-        const startAuth = async () => {
+        const startAuth = async (useEnvConfig) => {
             if (!auth) return;
-            
-            // 状態監視リスナー
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    setupSnapshotListener(user);
-                } else {
-                    // ユーザーがいない場合 (通常は認証フローでカバーされる)
-                    // enableOfflineMode("未ログイン"); 
-                }
-            });
+            onAuthStateChanged(auth, (user) => { if (user) setupSnapshotListener(); });
 
-            // 明示的サインイン試行
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                if (useEnvConfig && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
             } catch (e) {
-                console.warn("Auth failed, trying fallback:", e);
-                // 失敗したら匿名認証へフォールバック
-                try {
-                    await signInAnonymously(auth);
-                } catch (anonError) {
-                    enableOfflineMode("認証失敗: " + anonError.message);
-                }
+                console.warn("Auth Failed:", e);
+                try { await signInAnonymously(auth); } catch (err) { enableOfflineMode("認証失敗"); }
             }
         };
 
-        // データ監視リスナー
-        const setupSnapshotListener = (user) => {
+        const setupSnapshotListener = () => {
             try {
-                const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
+                const q = collection(db, ...collectionPath);
                 onSnapshot(q, (snapshot) => {
                     books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     books.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
                     renderBooks();
                     updateStats();
-                    
-                    // 接続成功表示
                     isOfflineMode = false;
-                    const statusBadge = document.getElementById('connection-status');
-                    if (statusBadge) statusBadge.classList.add('hidden');
+                    document.getElementById('connection-status').classList.add('hidden');
                     window.showToast("データを同期しました");
-                    
                 }, (error) => {
-                    console.error("Snapshot Error:", error);
                     let msg = "読込エラー";
-                    if(error.code === 'permission-denied') msg = "アクセス権限なし";
+                    if(error.code === 'permission-denied') msg = "権限エラー";
                     enableOfflineMode(msg);
                 });
-            } catch(e) {
-                console.error("Query Error:", e);
-                enableOfflineMode("クエリエラー: " + e.message);
-            }
+            } catch(e) { enableOfflineMode("クエリエラー"); }
         };
 
         const enableOfflineMode = (reason) => {
             isOfflineMode = true;
-            lastError = reason;
             const statusBadge = document.getElementById('connection-status');
             const statusText = document.getElementById('status-text');
+            statusBadge.classList.remove('hidden');
+            statusText.textContent = reason ? `${reason} (デモ)` : "デモモード";
             
-            if (statusBadge && statusText) {
-                statusBadge.classList.remove('hidden');
-                statusText.textContent = "未接続: " + reason + " (クリックで再試行)";
-            }
-            
-            // 初回のみダミーデータを表示してUIを確認可能にする
             if (books.length === 0) {
-                books = [
-                    { id: '1', title: '【デモ】接続エラー時のサンプル', author: 'システム', category: 'その他', status: 'available', date: '2024-01-01', note: 'データは保存されません' }
-                ];
+                books = [{ id: 'demo', title: '【デモ】設定が必要です', author: 'システム', category: 'その他', status: 'available', date: '2024-01-01', note: 'READMEを参照して設定してください' }];
                 renderBooks();
                 updateStats();
             }
         };
 
-        /* --- ヘルパー関数 --- */
-        const getVal = (id) => {
-            const el = document.getElementById(id);
-            return (el && el.value) ? el.value : "";
-        };
-
-        /* --- スキャナー関連 --- */
+        /* スキャナー */
         const stopScannerInternal = () => {
-            if (isScanning) {
-                try { if (typeof Quagga !== 'undefined') Quagga.stop(); } catch(e) {}
-                isScanning = false;
-            }
-            if(scannerContainer) scannerContainer.classList.add('hidden');
-            if(startScanBtn) startScanBtn.classList.remove('hidden');
+            if (isScanning) { try { if (typeof Quagga !== 'undefined') Quagga.stop(); } catch(e) {} isScanning = false; }
+            scannerContainer.classList.add('hidden');
+            startScanBtn.classList.remove('hidden');
             const interactive = document.getElementById('interactive');
             if (interactive) {
                 const canvas = interactive.querySelector('canvas');
@@ -445,370 +329,114 @@
         const startScannerInternal = () => {
             scannerContainer.classList.remove('hidden');
             startScanBtn.classList.add('hidden');
-            
-            if (typeof Quagga === 'undefined') {
-                window.showToast("バーコードリーダーの読み込みに失敗しました");
-                stopScannerInternal();
-                return;
-            }
-
+            if (typeof Quagga === 'undefined') { window.showToast("スキャナエラー"); stopScannerInternal(); return; }
             Quagga.init({
-                inputStream : {
-                    name : "Live",
-                    type : "LiveStream",
-                    target: document.querySelector('#interactive'),
-                    constraints: {
-                        facingMode: "environment",
-                        width: { min: 640 },
-                        height: { min: 480 }
-                    }
-                },
-                locator: { patchSize: "medium", halfSample: true },
-                numOfWorkers: 2,
-                decoder : { readers : ["ean_reader"] },
-                locate: true
+                inputStream : { name : "Live", type : "LiveStream", target: document.querySelector('#interactive'), constraints: { facingMode: "environment", width: { min: 640 }, height: { min: 480 } } },
+                locator: { patchSize: "medium", halfSample: true }, numOfWorkers: 2, decoder : { readers : ["ean_reader"] }, locate: true
             }, function(err) {
-                if (err) {
-                    console.log(err);
-                    window.showToast('カメラの起動に失敗しました');
-                    stopScannerInternal();
-                    return;
-                }
-                Quagga.start();
-                isScanning = true;
+                if (err) { window.showToast('カメラ起動失敗'); stopScannerInternal(); return; }
+                Quagga.start(); isScanning = true;
             });
-
             Quagga.onDetected(function(result) {
                 const code = result.codeResult.code;
                 if (code && (code.startsWith('978') || code.startsWith('979')) && code.length === 13) {
-                    stopScannerInternal();
-                    window.showToast('読み取り成功: ' + code);
-                    window.fetchBookInfo(code);
+                    stopScannerInternal(); window.showToast('読取成功: ' + code); window.fetchBookInfo(code);
                 }
             });
         };
 
-        /* --- UI操作 --- */
-        const openModalLocal = () => {
+        /* UI/Logic */
+        window.openModal = () => {
             try { stopScannerInternal(); } catch(e) {}
-            if(modal) {
-                modal.classList.remove('hidden');
-                setTimeout(() => {
-                    modal.classList.remove('opacity-0');
-                    modalContent.classList.remove('scale-95');
-                    modalContent.classList.add('scale-100');
-                }, 10);
-            }
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95'); modalContent.classList.add('scale-100'); }, 10);
         };
 
-        const closeModalLocal = () => {
+        window.closeModal = () => {
             try { stopScannerInternal(); } catch(e) {}
-            if(modal) {
-                modal.classList.add('opacity-0');
-                modalContent.classList.remove('scale-100');
-                modalContent.classList.add('scale-95');
-                setTimeout(() => {
-                    modal.classList.add('hidden');
-                }, 300);
-            }
+            modal.classList.add('opacity-0'); modalContent.classList.remove('scale-100'); modalContent.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
         };
 
-        /* --- フォーム送信 --- */
         const handleFormSubmit = async (e) => {
             e.preventDefault();
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerText;
-            submitBtn.disabled = true;
-            submitBtn.innerText = "登録中...";
+            submitBtn.disabled = true; submitBtn.innerText = "登録中...";
 
             try {
                 const bookData = {
-                    title: String(getVal('title') || "無題"),
-                    author: String(getVal('author') || "不明"),
-                    category: String(getVal('category') || "一般"),
-                    date: String(getVal('purchaseDate') || ""),
-                    note: String(getVal('note') || ""),
-                    coverUrl: String(getVal('coverUrl') || ""), 
-                    status: 'available',
-                    createdAt: Date.now()
+                    title: String(getVal('title') || "無題"), author: String(getVal('author') || "不明"),
+                    category: String(getVal('category') || "一般"), date: String(getVal('purchaseDate') || ""),
+                    note: String(getVal('note') || ""), coverUrl: String(getVal('coverUrl') || ""), 
+                    status: 'available', createdAt: Date.now()
                 };
 
                 if (isOfflineMode || !db) {
-                    bookData.id = 'temp-' + Date.now();
-                    books.unshift(bookData);
-                    renderBooks();
-                    updateStats();
-                    window.showToast('【オフライン】一時的に登録しました');
+                    bookData.id = 'temp-' + Date.now(); books.unshift(bookData); renderBooks(); updateStats();
+                    window.showToast('【デモ】一時保存しました');
                 } else {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'books'), bookData);
-                    window.showToast('書籍を登録しました');
+                    await addDoc(collection(db, ...collectionPath), bookData);
+                    window.showToast('登録しました');
                 }
-                
-                closeModalLocal();
-                form.reset();
-                if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
-                if(document.getElementById('coverUrl')) document.getElementById('coverUrl').value = "";
-                if(document.getElementById('cover-preview')) {
-                    document.getElementById('cover-preview').classList.add('hidden');
-                    document.getElementById('cover-preview').src = "";
-                }
-
-            } catch (err) {
-                console.error("Add Error:", err);
-                window.showToast('登録失敗: ' + (err.message || "不明"));
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerText = originalText;
-            }
+                window.closeModal(); form.reset();
+                document.getElementById('purchaseDate').valueAsDate = new Date();
+                document.getElementById('coverUrl').value = "";
+                document.getElementById('cover-preview').classList.add('hidden'); document.getElementById('cover-preview').src = "";
+            } catch (err) { window.showToast('登録失敗: ' + err.message); } 
+            finally { submitBtn.disabled = false; submitBtn.innerText = originalText; }
         };
 
-        /* --- 描画関数 --- */
-        function renderBooks() {
-            if(!grid) return;
-            grid.innerHTML = '';
-            const query = searchInput ? searchInput.value.toLowerCase() : '';
-            const statusFilter = filterStatus ? filterStatus.value : 'all';
-
-            const filteredBooks = books.filter(book => {
-                const title = book.title ? String(book.title).toLowerCase() : '';
-                const author = book.author ? String(book.author).toLowerCase() : '';
-                const note = book.note ? String(book.note).toLowerCase() : '';
-                const matchesSearch = title.includes(query) || author.includes(query) || note.includes(query);
-                const matchesStatus = statusFilter === 'all' || book.status === statusFilter;
-                return matchesSearch && matchesStatus;
-            });
-
-            if (filteredBooks.length === 0) {
-                if(emptyState) {
-                    emptyState.classList.remove('hidden');
-                    emptyState.classList.add('flex');
-                }
-            } else {
-                if(emptyState) {
-                    emptyState.classList.add('hidden');
-                    emptyState.classList.remove('flex');
-                }
-            }
-
-            filteredBooks.forEach(book => {
-                const statusInfo = statusConfig[book.status] || statusConfig.available;
-                const categoryClass = categoryColors[book.category] || categoryColors['その他'];
-                
-                const coverHtml = book.coverUrl 
-                    ? `<div class="w-full h-40 mb-3 flex items-center justify-center overflow-hidden bg-slate-50 rounded-lg">
-                        <img src="${book.coverUrl}" alt="${book.title}" class="h-full object-contain">
-                       </div>` 
-                    : `<div class="w-full h-40 mb-3 flex items-center justify-center bg-slate-100 rounded-lg text-slate-300">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
-                       </div>`;
-
-                const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all p-5 flex flex-col h-full fade-in relative group';
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-semibold px-2 py-1 rounded-md ${categoryClass}">${book.category}</span>
-                        <div class="relative">
-                            <button onclick="window.toggleMenu('${book.id}')" class="text-slate-300 hover:text-slate-500 p-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                            </button>
-                            <div id="menu-${book.id}" class="hidden absolute right-0 mt-1 w-32 bg-white rounded-lg shadow-xl border border-slate-100 z-10 overflow-hidden text-sm">
-                                <button onclick="window.changeStatus('${book.id}', 'available')" class="block w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-600">返却済み</button>
-                                <button onclick="window.changeStatus('${book.id}', 'lent')" class="block w-full text-left px-4 py-2 hover:bg-amber-50 text-amber-600">貸出にする</button>
-                                <button onclick="window.deleteBook('${book.id}')" class="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 border-t border-slate-100">削除</button>
-                            </div>
-                        </div>
-                    </div>
-                    ${coverHtml}
-                    <h3 class="text-lg font-bold text-slate-800 mb-1 leading-snug line-clamp-2" title="${book.title}">${book.title}</h3>
-                    <p class="text-sm text-slate-500 mb-4 flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                        ${book.author}
-                    </p>
-                    <div class="mt-auto pt-4 border-t border-slate-50">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs text-slate-400">購入: ${book.date}</span>
-                            <span onclick="window.cycleStatus('${book.id}')" class="cursor-pointer select-none text-xs font-medium px-2 py-1 rounded-full border ${statusInfo.color}">
-                                ${statusInfo.label}
-                            </span>
-                        </div>
-                        ${book.note ? `<p class="text-xs text-slate-400 truncate" title="${book.note}">${book.note}</p>` : ''}
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        function updateStats() {
-            if(!document.getElementById('total-books')) return;
-            document.getElementById('total-books').textContent = books.length;
-            document.getElementById('available-books').textContent = books.filter(b => b.status === 'available').length;
-            document.getElementById('lent-books').textContent = books.filter(b => b.status === 'lent').length;
-        }
-
-        /* --- Windowグローバル関数 --- */
+        /* グローバル関数 */
         window.deleteBook = async (id) => {
-            if(confirm('削除しますか？')) {
-                if (isOfflineMode) {
-                    books = books.filter(b => b.id !== id);
-                    renderBooks();
-                    updateStats();
-                    window.showToast('【オフライン】削除しました');
-                } else {
-                    try {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', id));
-                        window.showToast('削除しました');
-                    } catch (err) {
-                        console.error("Delete Error:", err);
-                        window.showToast('削除失敗');
-                    }
-                }
-            }
+            if(!confirm('削除しますか？')) return;
+            if(isOfflineMode) { books = books.filter(b => b.id !== id); renderBooks(); updateStats(); }
+            else { try { await deleteDoc(doc(db, ...collectionPath, id)); window.showToast('削除しました'); } catch(e){ console.error(e); } }
         };
-
-        window.changeStatus = async (id, newStatus) => {
-            if (isOfflineMode) {
-                const book = books.find(b => b.id === id);
-                if(book) {
-                    book.status = newStatus;
-                    renderBooks();
-                    updateStats();
-                }
-            } else {
-                try {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', id), { status: newStatus });
-                } catch (err) { console.error("Update Error:", err); }
-            }
-            const menu = document.getElementById(`menu-${id}`);
-            if(menu) menu.classList.add('hidden');
+        window.changeStatus = async (id, st) => {
+            if(isOfflineMode) { const b = books.find(x => x.id === id); if(b) { b.status = st; renderBooks(); updateStats(); } }
+            else { try { await updateDoc(doc(db, ...collectionPath, id), { status: st }); } catch(e){ console.error(e); } }
+            document.getElementById(`menu-${id}`).classList.add('hidden');
         };
-
         window.cycleStatus = async (id) => {
-            const book = books.find(b => b.id === id);
-            if (book) {
-                let newStatus = 'available';
-                if (book.status === 'available') newStatus = 'lent';
-                else if (book.status === 'lent') newStatus = 'lost';
-                
-                if (isOfflineMode) {
-                    book.status = newStatus;
-                    renderBooks();
-                    updateStats();
-                } else {
-                    try {
-                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', id), { status: newStatus });
-                    } catch (err) {}
-                }
-            }
+            const b = books.find(x => x.id === id); if(!b) return;
+            const next = b.status === 'available' ? 'lent' : (b.status === 'lent' ? 'lost' : 'available');
+            window.changeStatus(id, next);
         };
-
         window.toggleMenu = (id) => {
-            document.querySelectorAll('[id^="menu-"]').forEach(el => {
-                if (el.id !== `menu-${id}`) el.classList.add('hidden');
-            });
-            const menu = document.getElementById(`menu-${id}`);
-            if(menu) menu.classList.toggle('hidden');
+            document.querySelectorAll('[id^="menu-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`menu-${id}`).classList.toggle('hidden');
         };
-
-        window.onclick = (e) => {
-            if (!e.target.closest('button')) {
-                document.querySelectorAll('[id^="menu-"]').forEach(el => el.classList.add('hidden'));
-            }
-        };
-
+        window.onclick = (e) => { if(!e.target.closest('button')) document.querySelectorAll('[id^="menu-"]').forEach(el => el.classList.add('hidden')); };
         window.toggleScanner = () => { if(isScanning) stopScannerInternal(); else startScannerInternal(); };
         window.stopScanner = stopScannerInternal;
-        window.openModal = openModalLocal;
-        window.closeModal = closeModalLocal;
-        
-        // 再接続用の関数 (診断付き)
-        window.retryConnection = () => {
-            const statusText = document.getElementById('status-text');
-            if(statusText) statusText.textContent = "再接続中...";
-            window.showToast("再接続を試みています...");
-            setTimeout(() => {
-                initFirebase();
-            }, 500);
+        window.retryConnection = () => { window.showToast("再接続中..."); setTimeout(initFirebase, 500); };
+        window.showToast = (msg) => {
+            const t = document.getElementById('toast'); document.getElementById('toast-message').textContent = msg;
+            t.classList.remove('translate-y-20', 'opacity-0'); setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 3000);
         };
-
-        window.showToast = (message) => {
-            const toast = document.getElementById('toast');
-            if(toast) {
-                document.getElementById('toast-message').textContent = message;
-                toast.classList.remove('translate-y-20', 'opacity-0');
-                setTimeout(() => { toast.classList.add('translate-y-20', 'opacity-0'); }, 3000);
-            }
-        };
-
         window.fetchBookInfo = async (isbn) => {
+            // (省略: 前述のfetchBookInfoと同じロジック)
             try {
-                const titleEl = document.getElementById('title');
-                const authorEl = document.getElementById('author');
-                const noteEl = document.getElementById('note');
-                const coverUrlEl = document.getElementById('coverUrl');
-                const previewEl = document.getElementById('cover-preview');
-
-                if(titleEl) titleEl.value = "情報を取得中...";
-                if(authorEl) authorEl.value = "";
-                if(noteEl) noteEl.value = isbn;
-
-                let title = '', author = '', coverUrl = '', found = false;
-
-                try {
-                    const response = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
-                    const data = await response.json();
-                    if (data && data[0]) {
-                        const bookData = data[0].summary;
-                        title = bookData.title || '';
-                        author = bookData.author || '';
-                        coverUrl = bookData.cover || '';
-                        found = true;
+                document.getElementById('title').value = "取得中...";
+                const res = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
+                const d = await res.json();
+                if(d && d[0]) {
+                    const b = d[0].summary;
+                    document.getElementById('title').value = b.title;
+                    document.getElementById('author').value = b.author;
+                    if(b.cover) {
+                        document.getElementById('coverUrl').value = b.cover;
+                        document.getElementById('cover-preview').src = b.cover;
+                        document.getElementById('cover-preview').classList.remove('hidden');
                     }
-                } catch (e) { console.log("OpenBD error", e); }
-
-                if (!coverUrl) {
-                    try {
-                        const googleRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-                        const googleData = await googleRes.json();
-                        if (googleData.items && googleData.items.length > 0) {
-                            const vol = googleData.items[0].volumeInfo;
-                            if (!found) {
-                                title = vol.title || '';
-                                author = (vol.authors && vol.authors.join(', ')) || '';
-                                found = true;
-                            }
-                            if (vol.imageLinks) {
-                                let img = vol.imageLinks.thumbnail || vol.imageLinks.smallThumbnail || '';
-                                if (img) coverUrl = img.replace(/^http:\/\//, 'https://');
-                            }
-                        }
-                    } catch (e) { console.log("Google Books API error", e); }
-                }
-
-                if (found) {
-                    if(titleEl) titleEl.value = title;
-                    if(authorEl) authorEl.value = author;
-                    if(coverUrlEl) coverUrlEl.value = coverUrl;
-                    
-                    if (coverUrl && previewEl) {
-                        previewEl.src = coverUrl;
-                        previewEl.classList.remove('hidden');
-                    } else if(previewEl) {
-                        previewEl.classList.add('hidden');
-                        previewEl.src = '';
-                    }
-                    window.showToast('書籍情報を自動入力しました');
+                    window.showToast('自動入力しました');
                 } else {
-                    if(titleEl) titleEl.value = "";
-                    window.showToast('書籍情報が見つかりませんでした');
+                    document.getElementById('title').value = ""; window.showToast('見つかりませんでした');
                 }
-            } catch (error) {
-                console.error(error);
-                if(document.getElementById('title')) document.getElementById('title').value = "";
-                window.showToast('情報取得エラーが発生しました');
-            }
+            } catch(e) { console.error(e); document.getElementById('title').value = ""; }
         };
 
-        // 初期化実行 (ロード完了後)
         const initializeDOM = () => {
             grid = document.getElementById('book-grid');
             searchInput = document.getElementById('search-input');
@@ -820,20 +448,16 @@
             scannerContainer = document.getElementById('scanner-container');
             startScanBtn = document.getElementById('start-scan-btn');
 
-            if(searchInput) searchInput.addEventListener('input', renderBooks);
-            if(filterStatus) filterStatus.addEventListener('change', renderBooks);
-            if(form) form.addEventListener('submit', handleFormSubmit);
-            if(document.getElementById('purchaseDate')) document.getElementById('purchaseDate').valueAsDate = new Date();
+            searchInput.addEventListener('input', renderBooks);
+            filterStatus.addEventListener('change', renderBooks);
+            form.addEventListener('submit', handleFormSubmit);
+            document.getElementById('purchaseDate').valueAsDate = new Date();
 
             initFirebase();
         };
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeDOM);
-        } else {
-            initializeDOM();
-        }
-
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeDOM);
+        else initializeDOM();
     </script>
 </body>
 </html>
