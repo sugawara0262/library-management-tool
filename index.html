@@ -94,10 +94,10 @@
                 <h1 class="text-xl font-bold text-slate-700 tracking-wide">蔵書管理システム</h1>
             </div>
             <div class="flex items-center gap-3">
-                <!-- 接続ステータス表示 (クリックで再接続) -->
-                <button id="connection-status" onclick="window.retryConnection()" class="hidden px-3 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs rounded-full font-bold flex items-center gap-1 transition-colors group" title="クリックして詳細を表示/再接続">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:animate-spin"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                    <span id="status-text">オフライン（クリックで診断）</span>
+                <!-- 接続ステータス表示 (クリックで詳細) -->
+                <button id="connection-status" onclick="window.retryConnection()" class="hidden px-3 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs rounded-full font-bold flex items-center gap-1 transition-colors group" title="クリックして再接続">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:animate-spin"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span id="status-text">未接続</span>
                 </button>
                 <div class="text-sm text-slate-500 hidden sm:block">
                     施設の知を守る
@@ -278,7 +278,7 @@
         let auth = null;
         let appId = 'default-app-id';
         let isOfflineMode = false;
-        let lastErrorMessage = "初期化されていません";
+        let lastError = "初期化中...";
         
         let books = [];
         let isScanning = false;
@@ -301,19 +301,17 @@
         // DOM要素
         let grid, searchInput, filterStatus, modal, modalContent, form, emptyState, scannerContainer, startScanBtn;
 
-        // Firebase初期化 (安全策: 多重初期化防止)
+        // Firebase初期化 (堅牢化版)
         const initFirebase = () => {
-            window.showToast("システム接続中...");
             try {
-                if (typeof __firebase_config === 'undefined') throw new Error("設定が見つかりません(Config undefined)");
+                if (typeof __firebase_config === 'undefined') throw new Error("Config未定義");
                 
-                // 設定読み込み（文字列かオブジェクトか自動判別）
                 let config = __firebase_config;
                 if (typeof config === 'string') {
                     try {
                         config = JSON.parse(config);
                     } catch(e) {
-                        throw new Error("設定ファイルの解析に失敗(JSON Parse Error)");
+                        throw new Error("Configパースエラー");
                     }
                 }
 
@@ -335,98 +333,90 @@
                 // 認証開始
                 startAuth();
             } catch(e) {
-                console.error("Firebase Init Failed:", e);
+                console.error("Init Error:", e);
                 enableOfflineMode("初期化エラー: " + e.message);
+            }
+        };
+
+        // 認証処理 (標準フロー遵守)
+        const startAuth = async () => {
+            if (!auth) return;
+            
+            // 状態監視リスナー
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    setupSnapshotListener(user);
+                } else {
+                    // ユーザーがいない場合 (通常は認証フローでカバーされる)
+                    // enableOfflineMode("未ログイン"); 
+                }
+            });
+
+            // 明示的サインイン試行
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.warn("Auth failed, trying fallback:", e);
+                // 失敗したら匿名認証へフォールバック
+                try {
+                    await signInAnonymously(auth);
+                } catch (anonError) {
+                    enableOfflineMode("認証失敗: " + anonError.message);
+                }
+            }
+        };
+
+        // データ監視リスナー
+        const setupSnapshotListener = (user) => {
+            try {
+                const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
+                onSnapshot(q, (snapshot) => {
+                    books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    books.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    renderBooks();
+                    updateStats();
+                    
+                    // 接続成功表示
+                    isOfflineMode = false;
+                    const statusBadge = document.getElementById('connection-status');
+                    if (statusBadge) statusBadge.classList.add('hidden');
+                    window.showToast("データを同期しました");
+                    
+                }, (error) => {
+                    console.error("Snapshot Error:", error);
+                    let msg = "読込エラー";
+                    if(error.code === 'permission-denied') msg = "アクセス権限なし";
+                    enableOfflineMode(msg);
+                });
+            } catch(e) {
+                console.error("Query Error:", e);
+                enableOfflineMode("クエリエラー: " + e.message);
             }
         };
 
         const enableOfflineMode = (reason) => {
             isOfflineMode = true;
-            lastErrorMessage = reason || "不明なエラー";
-            console.warn("Offline Mode Enabled:", lastErrorMessage);
-
+            lastError = reason;
             const statusBadge = document.getElementById('connection-status');
             const statusText = document.getElementById('status-text');
-            if (statusBadge) {
+            
+            if (statusBadge && statusText) {
                 statusBadge.classList.remove('hidden');
-                if(statusText) statusText.textContent = "オフライン（クリックで診断）";
+                statusText.textContent = "未接続: " + reason + " (クリックで再試行)";
             }
             
-            // 初回のみメッセージ
-            if (books.length === 0 || (books.length === 1 && books[0].id.startsWith('temp'))) {
-                 window.showToast("接続失敗: " + lastErrorMessage);
-            }
-            
-            // ダミーデータ（データがない場合のみ）
+            // 初回のみダミーデータを表示してUIを確認可能にする
             if (books.length === 0) {
                 books = [
-                    { id: '1', title: '【デモ】接続失敗時のサンプル', author: 'システム', category: 'その他', status: 'available', date: '2024-01-01', note: 'データは保存されません' }
+                    { id: '1', title: '【デモ】接続エラー時のサンプル', author: 'システム', category: 'その他', status: 'available', date: '2024-01-01', note: 'データは保存されません' }
                 ];
                 renderBooks();
                 updateStats();
             }
-        };
-
-        const startAuth = async () => {
-            if (!auth) return;
-            window.showToast("認証中...");
-            
-            try {
-                // カスタムトークンがある場合
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    try {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } catch (tokenError) {
-                        console.warn("Token auth failed, trying anonymous:", tokenError);
-                        // トークン認証に失敗したら匿名認証へフォールバック
-                        await signInAnonymously(auth);
-                    }
-                } else {
-                    // トークンがない場合
-                    if (!auth.currentUser) {
-                        await signInAnonymously(auth);
-                    }
-                }
-            } catch(e) {
-                console.error("Auth Failed:", e);
-                enableOfflineMode("認証エラー: " + e.message);
-                return;
-            }
-
-            // 認証状態の監視
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    window.showToast("データ取得中...");
-                    try {
-                        const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
-                        onSnapshot(q, (snapshot) => {
-                            books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            books.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                            renderBooks();
-                            updateStats();
-                            
-                            // 接続成功したらオフラインバッジを消す
-                            isOfflineMode = false;
-                            const statusBadge = document.getElementById('connection-status');
-                            if (statusBadge) statusBadge.classList.add('hidden');
-                            window.showToast("接続完了: 最新データを表示中");
-                            
-                        }, (error) => {
-                            console.error("Snapshot Error:", error);
-                            // 権限エラーなどはオフライン扱いにする
-                            let msg = "データ読込エラー";
-                            if(error.code === 'permission-denied') msg = "アクセス権限がありません";
-                            enableOfflineMode(msg);
-                        });
-                    } catch(e) {
-                        console.error("Query Error:", e);
-                        enableOfflineMode("クエリエラー: " + e.message);
-                    }
-                } else {
-                    // ユーザーがいない場合（基本ありえないが念のため）
-                    enableOfflineMode("ユーザー認証なし");
-                }
-            });
         };
 
         /* --- ヘルパー関数 --- */
@@ -732,13 +722,9 @@
         
         // 再接続用の関数 (診断付き)
         window.retryConnection = () => {
-            if(isOfflineMode) {
-                window.showToast("診断: " + lastErrorMessage);
-            }
-            
             const statusText = document.getElementById('status-text');
             if(statusText) statusText.textContent = "再接続中...";
-            
+            window.showToast("再接続を試みています...");
             setTimeout(() => {
                 initFirebase();
             }, 500);
