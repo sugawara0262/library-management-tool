@@ -121,7 +121,7 @@
                 <div class="flex gap-2 items-end">
                     <div class="relative flex-grow">
                         <input type="text" id="isbn-input" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="ISBN" onkeypress="if(event.key === 'Enter'){event.preventDefault(); window.manualSearch();}">
-                        <label for="isbn-input" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN (読めない場合はこちら)</label>
+                        <label for="isbn-input" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN (例: 978-4...)</label>
                     </div>
                     <button type="button" onclick="window.manualSearch()" class="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors">検索</button>
                 </div>
@@ -139,10 +139,9 @@
                                 </svg>
                             </div>
 
-                            <!-- プレビュー画像 -->
-                            <img id="cover-preview" src="" alt="表紙プレビュー" class="hidden h-full object-contain z-10 bg-white">
-                            
-                            <!-- No Image 表示 -->
+                            <!-- プレビュー画像 (onerrorで自動的にNo Imageに切り替え) -->
+                            <img id="cover-preview" src="" alt="表紙プレビュー" class="hidden h-full object-contain z-10 bg-white" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <!-- No Image 表示 (display:flex/noneで制御) -->
                             <div id="no-image-preview" class="flex flex-col items-center justify-center text-slate-400">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-1"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                                 <span class="text-xs">No Image</span>
@@ -226,6 +225,10 @@
              document.getElementById('coverUrl').value = url;
              if(urlInput && urlInput.value !== url) urlInput.value = url;
 
+             // スタイルリセット (HTMLのonerrorで付与されたstyleをクリア)
+             preview.style.display = ''; 
+             noImage.style.display = '';
+
              // リセット
              preview.onload = null;
              preview.onerror = null;
@@ -233,25 +236,25 @@
              if(!url) {
                  preview.classList.add('hidden');
                  noImage.classList.remove('hidden');
-                 loading.classList.add('hidden');
+                 if(loading) loading.classList.add('hidden');
                  preview.src = "";
                  return;
              }
 
              // ロード開始
-             loading.classList.remove('hidden'); // ローディング表示
+             if(loading) loading.classList.remove('hidden'); // ローディング表示
              preview.classList.add('hidden'); // 画像はいったん隠す
              noImage.classList.add('hidden'); // No Imageも隠す
              
              // ロード完了時の処理
              preview.onload = () => {
-                 loading.classList.add('hidden'); // ローディング消す
+                 if(loading) loading.classList.add('hidden'); // ローディング消す
                  preview.classList.remove('hidden'); // 画像出す
                  noImage.classList.add('hidden');
              };
              // エラー時の処理
              preview.onerror = () => {
-                 loading.classList.add('hidden'); 
+                 if(loading) loading.classList.add('hidden'); 
                  preview.classList.add('hidden');
                  noImage.classList.remove('hidden'); // No Imageに戻す
                  window.showToast('画像の読み込みに失敗しました');
@@ -519,9 +522,13 @@
                 document.getElementById('note').value = isbn; 
                 
                 // ローディング開始
-                document.getElementById('loading-preview').classList.remove('hidden');
-                document.getElementById('no-image-preview').classList.add('hidden');
-                document.getElementById('cover-preview').classList.add('hidden');
+                const loading = document.getElementById('loading-preview');
+                const preview = document.getElementById('cover-preview');
+                const noImage = document.getElementById('no-image-preview');
+                
+                if(loading) loading.classList.remove('hidden');
+                if(preview) preview.classList.add('hidden');
+                if(noImage) noImage.classList.add('hidden');
 
                 let title = '', author = '', coverUrl = '', found = false;
 
@@ -568,14 +575,15 @@
                     window.showToast('書籍情報を自動入力しました');
                 } else {
                     document.getElementById('title').value = "";
-                    document.getElementById('loading-preview').classList.add('hidden');
-                    document.getElementById('no-image-preview').classList.remove('hidden');
+                    if(loading) loading.classList.add('hidden');
+                    if(noImage) noImage.classList.remove('hidden');
                     window.showToast('書籍情報が見つかりませんでした');
                 }
             } catch (error) {
                 console.error(error);
                 document.getElementById('title').value = "";
-                document.getElementById('loading-preview').classList.add('hidden');
+                const loading = document.getElementById('loading-preview');
+                if(loading) loading.classList.add('hidden');
                 window.showToast('情報取得エラーが発生しました');
             }
         };
