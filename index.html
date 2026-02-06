@@ -38,6 +38,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     <span id="status-text">未接続</span>
                 </button>
+                <div class="text-sm text-slate-500 hidden sm:block">運用版</div>
             </div>
         </div>
     </header>
@@ -169,7 +170,7 @@
         // --- Helper Functions ---
         const getVal = (id) => { const el = document.getElementById(id); return (el && el.value) ? el.value : ""; };
 
-        // --- UI Rendering Functions ---
+        // --- UI Rendering Functions (Moved to top to prevent ReferenceError) ---
         function renderBooks() {
             if(!grid) return;
             grid.innerHTML = '';
@@ -310,7 +311,7 @@
             statusText.textContent = reason ? `${reason} (デモ)` : "デモモード";
             
             if (books.length === 0) {
-                books = [{ id: 'demo', title: '【デモ】Firebase未接続', author: 'システム', category: 'その他', status: 'available', date: '2024-01-01', note: 'Firestoreのルールを確認してください' }];
+                books = [{ id: 'demo', title: '【デモ】設定が必要です', author: 'システム', category: 'その他', status: 'available', date: '2024-01-01', note: 'READMEを参照して設定してください' }];
                 renderBooks();
                 updateStats();
             }
@@ -452,7 +453,6 @@
                 } catch (e) { console.log("OpenBD error", e); }
 
                 // 2. Google Books API (フォールバック)
-                // タイトルが見つからない、または表紙画像がない場合に実行
                 if (!found || !coverUrl) {
                     try {
                         const googleRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
