@@ -104,7 +104,7 @@
             </div>
             
             <div class="overflow-y-auto p-6 space-y-5">
-                <!-- 1. スキャナー起動ボタン (メイン) -->
+                <!-- 1. スキャナー起動ボタン -->
                 <button type="button" onclick="window.toggleScanner()" id="start-scan-btn" class="w-full py-4 rounded-lg border-2 border-dashed border-slate-400 text-slate-600 hover:border-slate-600 hover:text-slate-800 hover:bg-slate-50 transition-all flex flex-col items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
                     <span class="font-bold text-lg">バーコードをスキャンして自動入力</span>
@@ -117,26 +117,17 @@
                     <button type="button" onclick="window.stopScanner()" class="w-full py-2 text-sm text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg">カメラを閉じる</button>
                 </div>
                 
-                <!-- 2. 手動入力切り替え (サブ) -->
-                <div class="text-center">
-                    <button type="button" onclick="document.getElementById('manual-isbn-area').classList.toggle('hidden');" class="text-xs text-slate-400 hover:text-slate-600 underline decoration-dashed">
-                        スキャンできない場合はこちら (ISBN手動入力)
-                    </button>
-                </div>
-
-                <!-- 手動ISBN入力エリア (デフォルト非表示) -->
-                <div id="manual-isbn-area" class="hidden flex gap-2 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <!-- 手動入力エリア (補助) -->
+                <div class="flex gap-2 items-end">
                     <div class="relative flex-grow">
                         <input type="text" id="isbn-input" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="ISBN" onkeypress="if(event.key === 'Enter'){event.preventDefault(); window.manualSearch();}">
-                        <label for="isbn-input" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN (例: 978...)</label>
+                        <label for="isbn-input" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">ISBN (読めない場合はこちら)</label>
                     </div>
-                    <button type="button" onclick="window.manualSearch()" class="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors">
-                        検索
-                    </button>
+                    <button type="button" onclick="window.manualSearch()" class="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors">検索</button>
                 </div>
 
                 <form id="add-book-form" class="space-y-5 border-t border-slate-100 pt-5">
-                    <!-- 表紙画像プレビューエリア -->
+                    <!-- 表紙画像エリア -->
                     <div class="flex flex-col items-center justify-center mb-4">
                         <div class="relative h-40 w-full flex items-center justify-center bg-slate-50 rounded-lg border border-slate-200 mb-2 overflow-hidden">
                             <img id="cover-preview" src="" alt="表紙プレビュー" class="hidden h-full object-contain z-10 bg-white" onerror="this.classList.add('hidden'); document.getElementById('no-image-preview').classList.remove('hidden');">
@@ -152,8 +143,6 @@
                             <input type="text" id="coverUrl-input" class="w-full px-3 py-2 text-sm rounded border border-slate-300 focus:outline-none focus:border-blue-500" placeholder="https://example.com/image.jpg" onchange="window.updateCoverPreview(this.value)">
                         </div>
                     </div>
-                    
-                    <!-- 内部保持用 -->
                     <input type="hidden" id="coverUrl">
 
                     <div class="relative"><input type="text" id="title" class="floating-input w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none transition-colors placeholder-transparent" placeholder="タイトル" required><label for="title" class="absolute left-4 top-3 text-slate-400 transition-all pointer-events-none">書籍タイトル *</label></div>
@@ -409,7 +398,6 @@
             document.getElementById('coverUrl').value = "";
             document.getElementById('coverUrl-input').value = "";
             document.getElementById('manual-cover-input').classList.add('hidden');
-            document.getElementById('manual-isbn-area').classList.add('hidden');
         };
 
         window.closeModal = () => {
@@ -493,7 +481,8 @@
                 preview.src = "";
                 preview.classList.add('hidden');
                 noImage.classList.add('hidden');
-                manualInput.classList.add('hidden');
+                // 手動入力を強制しない (元に戻す)
+                // manualInput.classList.add('hidden'); 
 
                 let title = '', author = '', coverUrl = '', found = false;
 
@@ -540,13 +529,13 @@
                         document.getElementById('coverUrl').value = coverUrl;
                         preview.src = coverUrl;
                         preview.classList.remove('hidden');
+                        noImage.classList.add('hidden');
                     } else {
-                        // 画像が見つからない場合
+                        // 画像が見つからない場合: No Imageを表示して手動入力を促さない
+                        preview.classList.add('hidden');
                         noImage.classList.remove('hidden');
-                        manualInput.classList.remove('hidden');
-                        document.getElementById('coverUrl-input').focus();
-                        window.showToast('画像が見つかりませんでした。手動で設定できます。');
-                        return; // ここでトースト出したので終了
+                        // 手動入力は任意
+                        document.getElementById('coverUrl').value = "";
                     }
                     window.showToast('書籍情報を自動入力しました');
                 } else {
