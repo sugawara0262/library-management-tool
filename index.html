@@ -95,9 +95,9 @@
             </div>
             <div class="flex items-center gap-3">
                 <!-- 接続ステータス表示 (クリックで再接続) -->
-                <button id="connection-status" onclick="window.retryConnection()" class="hidden px-3 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs rounded-full font-bold flex items-center gap-1 transition-colors group" title="クリックして再接続">
+                <button id="connection-status" onclick="window.retryConnection()" class="hidden px-3 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs rounded-full font-bold flex items-center gap-1 transition-colors group" title="クリックして詳細を表示/再接続">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:animate-spin"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                    オフライン（クリックで再接続）
+                    <span id="status-text">オフライン（クリックで診断）</span>
                 </button>
                 <div class="text-sm text-slate-500 hidden sm:block">
                     施設の知を守る
@@ -278,6 +278,7 @@
         let auth = null;
         let appId = 'default-app-id';
         let isOfflineMode = false;
+        let lastErrorMessage = "初期化されていません";
         
         let books = [];
         let isScanning = false;
@@ -302,13 +303,18 @@
 
         // Firebase初期化 (安全策: 多重初期化防止)
         const initFirebase = () => {
+            window.showToast("システム接続中...");
             try {
-                if (typeof __firebase_config === 'undefined') throw new Error("Config not defined");
+                if (typeof __firebase_config === 'undefined') throw new Error("設定が見つかりません(Config undefined)");
                 
                 // 設定読み込み（文字列かオブジェクトか自動判別）
                 let config = __firebase_config;
                 if (typeof config === 'string') {
-                    config = JSON.parse(config);
+                    try {
+                        config = JSON.parse(config);
+                    } catch(e) {
+                        throw new Error("設定ファイルの解析に失敗(JSON Parse Error)");
+                    }
                 }
 
                 // アプリの取得または初期化
@@ -330,25 +336,25 @@
                 startAuth();
             } catch(e) {
                 console.error("Firebase Init Failed:", e);
-                enableOfflineMode();
+                enableOfflineMode("初期化エラー: " + e.message);
             }
         };
 
-        const enableOfflineMode = () => {
+        const enableOfflineMode = (reason) => {
             isOfflineMode = true;
+            lastErrorMessage = reason || "不明なエラー";
+            console.warn("Offline Mode Enabled:", lastErrorMessage);
+
             const statusBadge = document.getElementById('connection-status');
+            const statusText = document.getElementById('status-text');
             if (statusBadge) {
                 statusBadge.classList.remove('hidden');
-                // ボタン表示を元に戻す
-                statusBadge.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                    オフライン（クリックで再接続）
-                `;
+                if(statusText) statusText.textContent = "オフライン（クリックで診断）";
             }
             
             // 初回のみメッセージ
             if (books.length === 0 || (books.length === 1 && books[0].id.startsWith('temp'))) {
-                 window.showToast("接続失敗: オフラインモード起動");
+                 window.showToast("接続失敗: " + lastErrorMessage);
             }
             
             // ダミーデータ（データがない場合のみ）
@@ -363,22 +369,34 @@
 
         const startAuth = async () => {
             if (!auth) return;
+            window.showToast("認証中...");
+            
             try {
+                // カスタムトークンがある場合
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } catch (tokenError) {
+                        console.warn("Token auth failed, trying anonymous:", tokenError);
+                        // トークン認証に失敗したら匿名認証へフォールバック
+                        await signInAnonymously(auth);
+                    }
                 } else {
-                    // 既にログイン済みならスキップしたいが、念のため匿名認証を通す（エラーならcatchへ）
+                    // トークンがない場合
                     if (!auth.currentUser) {
                         await signInAnonymously(auth);
                     }
                 }
             } catch(e) {
-                console.error("Auth Error:", e);
-                // 認証エラーでも即オフラインにせず、リスナーで判定させる
+                console.error("Auth Failed:", e);
+                enableOfflineMode("認証エラー: " + e.message);
+                return;
             }
 
+            // 認証状態の監視
             onAuthStateChanged(auth, (user) => {
                 if (user) {
+                    window.showToast("データ取得中...");
                     try {
                         const q = collection(db, 'artifacts', appId, 'public', 'data', 'books');
                         onSnapshot(q, (snapshot) => {
@@ -391,18 +409,22 @@
                             isOfflineMode = false;
                             const statusBadge = document.getElementById('connection-status');
                             if (statusBadge) statusBadge.classList.add('hidden');
+                            window.showToast("接続完了: 最新データを表示中");
                             
                         }, (error) => {
                             console.error("Snapshot Error:", error);
-                            enableOfflineMode();
+                            // 権限エラーなどはオフライン扱いにする
+                            let msg = "データ読込エラー";
+                            if(error.code === 'permission-denied') msg = "アクセス権限がありません";
+                            enableOfflineMode(msg);
                         });
                     } catch(e) {
                         console.error("Query Error:", e);
-                        enableOfflineMode();
+                        enableOfflineMode("クエリエラー: " + e.message);
                     }
                 } else {
-                    // ユーザーがいない場合
-                    enableOfflineMode();
+                    // ユーザーがいない場合（基本ありえないが念のため）
+                    enableOfflineMode("ユーザー認証なし");
                 }
             });
         };
@@ -708,19 +730,15 @@
         window.openModal = openModalLocal;
         window.closeModal = closeModalLocal;
         
-        // 再接続用の関数
+        // 再接続用の関数 (診断付き)
         window.retryConnection = () => {
-            // UIを「接続中」に変更
-            const statusBadge = document.getElementById('connection-status');
-            if(statusBadge) {
-                statusBadge.innerHTML = `
-                    <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                    接続中...
-                `;
+            if(isOfflineMode) {
+                window.showToast("診断: " + lastErrorMessage);
             }
-            window.showToast("再接続を試みています...");
             
-            // 少し待ってから実行（UI描画のため）
+            const statusText = document.getElementById('status-text');
+            if(statusText) statusText.textContent = "再接続中...";
+            
             setTimeout(() => {
                 initFirebase();
             }, 500);
