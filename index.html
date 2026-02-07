@@ -13,75 +13,77 @@
 body { font-family:'Noto Sans JP',sans-serif; background:#f0f4f8; }
 .fade-in{ animation:fadeIn .25s ease; }
 @keyframes fadeIn{ from{opacity:0;transform:translateY(6px)} to{opacity:1} }
-#interactive{ height:240px; background:#000; border-radius:12px; overflow:hidden }
-.scan-overlay{ position:absolute; inset:20% 10%; border:2px solid red; pointer-events:none }
+#interactive{ height:220px; background:#000; border-radius:12px; overflow:hidden }
+.scan-overlay{ position:absolute; inset:20% 10%; border:2px solid red }
 </style>
 </head>
 
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen">
 
 <header class="bg-white shadow sticky top-0 z-10">
-  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-    <h1 class="font-bold text-xl">📚 蔵書管理システム</h1>
+  <div class="px-4 h-14 flex items-center justify-between">
+    <h1 class="font-bold">📚 蔵書管理</h1>
+    <!-- PC用 -->
+    <button onclick="openModal()"
+      class="hidden md:inline bg-slate-700 text-white px-4 py-2 rounded">
+      ＋ 登録
+    </button>
   </div>
 </header>
 
-<main class="flex-grow max-w-7xl mx-auto px-4 py-6 w-full">
-
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  <div class="bg-white p-4 rounded shadow"><p class="text-sm">総蔵書数</p><p id="total-books" class="text-3xl font-bold">0</p></div>
-  <div class="bg-white p-4 rounded shadow"><p class="text-sm">貸出可能</p><p id="available-books" class="text-3xl font-bold">0</p></div>
-  <div class="bg-white p-4 rounded shadow"><p class="text-sm">貸出中</p><p id="lent-books" class="text-3xl font-bold">0</p></div>
-</div>
-
-<div class="flex gap-3 mb-4">
-  <input id="search-input" placeholder="検索…" class="flex-1 border px-3 py-2 rounded">
-  <select id="filter-status" class="border px-3 py-2 rounded">
-    <option value="all">全て</option>
-    <option value="available">貸出可能</option>
-    <option value="lent">貸出中</option>
-  </select>
-  <button onclick="openModal()" class="bg-slate-700 text-white px-5 rounded">＋ 登録</button>
-</div>
-
-<div id="book-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
-<div id="empty-state" class="hidden text-center py-10 text-gray-400">書籍がありません</div>
-
+<main class="p-4">
+  <div id="book-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+  <p id="empty-state" class="text-center text-gray-400 hidden">書籍がありません</p>
 </main>
 
+<!-- モバイル用FAB -->
+<button onclick="openModal()"
+  class="md:hidden fixed bottom-6 right-6 z-40
+         w-16 h-16 rounded-full
+         bg-slate-700 text-white
+         text-3xl shadow-lg">
+  ＋
+</button>
+
 <!-- ===== モーダル ===== -->
-<div id="modal" class="fixed inset-0 bg-black/50 hidden items-end md:items-center justify-center z-50">
-  <div class="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl p-5 max-h-[90vh] overflow-y-auto">
+<div id="modal" class="fixed inset-0 bg-black/50 hidden items-end z-50">
+  <div class="bg-white w-full rounded-t-2xl p-4 max-h-[90vh] overflow-y-auto">
 
-    <h2 class="font-bold text-lg mb-3">書籍登録</h2>
+    <h2 class="font-bold mb-2">書籍登録</h2>
 
-    <button id="start-scan-btn" onclick="toggleScanner()" class="border-dashed border w-full py-3 mb-3">
+    <button onclick="toggleScanner()"
+      class="border-dashed border w-full py-2 mb-2">
       📷 バーコードスキャン
     </button>
 
-    <div id="scanner-container" class="hidden mb-3 relative">
+    <div id="scanner" class="hidden mb-2 relative">
       <div id="interactive"><div class="scan-overlay"></div></div>
-      <button onclick="stopScanner()" class="text-sm text-red-500 mt-1">閉じる</button>
+      <button onclick="stopScanner()" class="text-sm text-red-500">閉じる</button>
     </div>
 
-    <form id="add-book-form" class="space-y-3">
-      <input id="isbn-input" placeholder="ISBN" class="border w-full px-3 py-2 rounded">
-      <input id="mc-number" placeholder="MC番号（10桁）" class="border w-full px-3 py-2 rounded">
-      <input id="title" placeholder="タイトル*" required class="border w-full px-3 py-2 rounded">
-      <input id="author" placeholder="著者" class="border w-full px-3 py-2 rounded">
-      <textarea id="note" placeholder="備考" class="border w-full px-3 py-2 rounded"></textarea>
+    <!-- 表紙プレビュー -->
+    <div id="cover-preview"
+      class="w-full h-48 bg-gray-100 flex items-center justify-center text-gray-400 mb-2 rounded">
+      表紙プレビュー
+    </div>
 
-      <!-- iPhone対策余白 -->
+    <form id="book-form" class="space-y-2">
+      <input id="isbn" placeholder="ISBN"
+        class="border w-full px-3 py-2 rounded">
+      <input id="title" placeholder="タイトル*"
+        required class="border w-full px-3 py-2 rounded">
+      <input id="author" placeholder="著者"
+        class="border w-full px-3 py-2 rounded">
+
       <div class="h-24"></div>
 
-      <!-- 固定フッター -->
-      <div class="sticky bottom-0 bg-white pt-3 pb-4 flex gap-3">
+      <div class="sticky bottom-0 bg-white pt-2 pb-3 flex gap-2">
         <button type="button" onclick="closeModal()"
-          class="flex-1 border py-3 rounded text-lg">
+          class="flex-1 border py-3 rounded">
           キャンセル
         </button>
         <button type="submit"
-          class="flex-1 bg-slate-700 text-white rounded text-lg font-bold">
+          class="flex-1 bg-slate-700 text-white rounded font-bold">
           登録
         </button>
       </div>
@@ -90,175 +92,123 @@ body { font-family:'Noto Sans JP',sans-serif; background:#f0f4f8; }
   </div>
 </div>
 
-<!-- ===== Toast ===== -->
-<div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-4 py-2 rounded opacity-0 transition">
-  <span id="toast-message"></span>
-</div>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, deleteDoc, onSnapshot, serverTimestamp, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-/* ===== Firebase設定 ===== */
+/* Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyChSeXTRYpykQkMmcDj041nlq-Nkt03oC4",
   authDomain: "library-management-tool-31dcd.firebaseapp.com",
   projectId: "library-management-tool-31dcd"
 };
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+signInAnonymously(auth);
 
-/* ===== 状態 ===== */
-let db, auth, books = [], isScanning = false;
+const grid = document.getElementById('book-grid');
+const empty = document.getElementById('empty-state');
 
-/* ===== Utils ===== */
-const normalizeISBN = v => (v || "").replace(/[^0-9]/g,'');
+/* ===== 表示 ===== */
+onSnapshot(collection(db,"books"), snap=>{
+  grid.innerHTML="";
+  if(snap.empty){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
 
-function showToast(msg){
-  const t = document.getElementById('toast');
-  document.getElementById('toast-message').textContent = msg;
-  t.classList.remove('opacity-0');
-  setTimeout(()=>t.classList.add('opacity-0'), 2200);
-}
-
-/* ===== 表紙取得（iPhone完全対応） ===== */
-async function fetchCoverByISBN(isbn){
-  if(!isbn) return "";
-
-  try{
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-    const data = await res.json();
-    const img =
-      data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail ||
-      data.items?.[0]?.volumeInfo?.imageLinks?.smallThumbnail;
-
-    if(img){
-      return img
-        .replace("http://", "https://")
-        .replace("zoom=1", "zoom=2");
-    }
-  }catch(e){}
-
-  return `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
-}
-
-/* ===== 描画 ===== */
-function renderBooks(){
-  const grid = document.getElementById('book-grid');
-  grid.innerHTML = "";
-
-  const q = document.getElementById('search-input').value.toLowerCase();
-  const st = document.getElementById('filter-status').value;
-
-  const filtered = books.filter(b =>
-    (!q || (b.title||"").toLowerCase().includes(q)) &&
-    (st === "all" || b.status === st)
-  );
-
-  document.getElementById('empty-state')
-    .classList.toggle('hidden', filtered.length > 0);
-
-  filtered.forEach(b => {
-    const d = document.createElement('div');
-    d.className = "bg-white p-4 rounded shadow fade-in";
-    d.innerHTML = `
-      <img src="${b.coverUrl || ''}"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-        class="w-full h-48 object-contain mb-2 rounded">
-      <div class="w-full h-48 bg-gray-100 hidden items-center justify-center text-xs text-gray-400 mb-2 rounded">
-        表紙なし
-      </div>
-      <h3 class="font-bold">${b.title}</h3>
-      <p class="text-sm">${b.author || ""}</p>
-      <p class="text-xs text-gray-500">${b.isbn || ""}</p>
-      <button onclick="deleteBook('${b.id}')" class="text-xs text-red-500 mt-2">削除</button>
+  snap.forEach(d=>{
+    const b=d.data();
+    const div=document.createElement('div');
+    div.className="bg-white p-3 rounded shadow fade-in";
+    div.innerHTML=`
+      <img src="${b.coverUrl||''}" class="h-40 w-full object-contain mb-2"
+       onerror="this.style.display='none'">
+      <p class="font-bold">${b.title}</p>
+      <p class="text-sm">${b.author||''}</p>
     `;
-    grid.appendChild(d);
+    grid.appendChild(div);
   });
+});
 
-  document.getElementById('total-books').textContent = books.length;
-  document.getElementById('available-books').textContent = books.filter(b=>b.status==="available").length;
-  document.getElementById('lent-books').textContent = books.filter(b=>b.status==="lent").length;
+/* ===== ISBN自動取得 ===== */
+async function autofill(isbn){
+  if(!isbn) return;
+  const res = await fetch(
+    `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`
+  );
+  const data = await res.json();
+  const info = data.items?.[0]?.volumeInfo;
+  if(!info) return;
+
+  if(info.title) title.value = info.title;
+  if(info.authors) author.value = info.authors.join(" / ");
+
+  const img = info.imageLinks?.thumbnail;
+  if(img){
+    const url = img.replace("http://","https://").replace("zoom=1","zoom=2");
+    isbn.dataset.cover = url;
+    coverPreview(url);
+  }
 }
 
-/* ===== モーダル制御 ===== */
-window.openModal = () => document.getElementById('modal').classList.remove('hidden');
-window.closeModal = () => { stopScanner(); document.getElementById('modal').classList.add('hidden'); };
+function coverPreview(url){
+  const box=document.getElementById('cover-preview');
+  box.innerHTML=`<img src="${url}" class="h-full object-contain">`;
+}
+
+/* ISBN入力イベント */
+isbn.addEventListener('change', e=>{
+  autofill(e.target.value.replace(/[^0-9]/g,''));
+});
 
 /* ===== スキャナ ===== */
-function stopScanner(){
-  if(isScanning){ Quagga.stop(); Quagga.offDetected(); }
-  isScanning = false;
-  document.getElementById('scanner-container').classList.add('hidden');
-  document.getElementById('start-scan-btn').classList.remove('hidden');
-}
-
-window.toggleScanner = () => {
-  document.getElementById('scanner-container').classList.remove('hidden');
-  document.getElementById('start-scan-btn').classList.add('hidden');
-
+let scanning=false;
+window.toggleScanner=()=>{
+  document.getElementById('scanner').classList.remove('hidden');
   Quagga.init({
-    inputStream:{ type:"LiveStream", target:"#interactive", constraints:{ facingMode:"environment" }},
-    decoder:{ readers:["ean_reader"] }
-  }, err => {
-    if(err){ showToast("カメラ起動失敗"); return; }
+    inputStream:{type:"LiveStream",target:"#interactive",
+      constraints:{facingMode:"environment"}},
+    decoder:{readers:["ean_reader"]}
+  },()=>{
     Quagga.start();
-    isScanning = true;
-    Quagga.onDetected(res => {
-      const code = res.codeResult.code;
-      if(/^97[89]\d{10}$/.test(code)){
-        document.getElementById('isbn-input').value = code;
-        showToast("ISBN取得: " + code);
+    scanning=true;
+    Quagga.onDetected(r=>{
+      const code=r.codeResult.code;
+      if(/^97[89]/.test(code)){
+        isbn.value=code;
+        autofill(code);
         stopScanner();
       }
     });
   });
 };
-
-/* ===== CRUD ===== */
-window.deleteBook = async id => {
-  if(!confirm("削除しますか？")) return;
-  await deleteDoc(doc(db, "books", id));
+window.stopScanner=()=>{
+  if(scanning){Quagga.stop();Quagga.offDetected();}
+  document.getElementById('scanner').classList.add('hidden');
 };
 
-document.getElementById('add-book-form').addEventListener('submit', async e => {
+/* ===== 登録 ===== */
+bookForm.addEventListener('submit', async e=>{
   e.preventDefault();
+  const cover = isbn.dataset.cover ||
+    `https://covers.openlibrary.org/b/isbn/${isbn.value}-L.jpg`;
 
-  const isbn = normalizeISBN(document.getElementById('isbn-input').value);
-  const coverUrl = await fetchCoverByISBN(isbn);
-
-  await addDoc(collection(db, "books"), {
-    isbn,
-    mcNumber: document.getElementById('mc-number').value,
-    title: document.getElementById('title').value,
-    author: document.getElementById('author').value || "不明",
-    note: document.getElementById('note').value || "",
-    coverUrl,
-    status: "available",
-    createdAt: serverTimestamp()
+  await addDoc(collection(db,"books"),{
+    isbn:isbn.value,
+    title:title.value,
+    author:author.value,
+    coverUrl:cover,
+    createdAt:serverTimestamp()
   });
-
-  showToast("登録しました");
-  e.target.reset();
   closeModal();
+  bookForm.reset();
+  coverPreview("");
 });
 
-/* ===== Firebase ===== */
-const app = initializeApp(firebaseConfig);
-auth = getAuth(app);
-db = getFirestore(app);
-
-onAuthStateChanged(auth, u => {
-  if(u){
-    onSnapshot(collection(db, "books"), snap => {
-      books = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-      renderBooks();
-    });
-  }
-});
-signInAnonymously(auth);
-
-document.getElementById('search-input').addEventListener('input', renderBooks);
-document.getElementById('filter-status').addEventListener('change', renderBooks);
+/* モーダル */
+window.openModal=()=>modal.classList.remove('hidden');
+window.closeModal=()=>modal.classList.add('hidden');
 </script>
 
 </body>
