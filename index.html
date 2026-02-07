@@ -5,10 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>蔵書管理システム Pro</title>
 
-<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 
 <style>
@@ -73,7 +70,7 @@ body { font-family: 'Noto Sans JP', sans-serif; background:#f8fafc; }
 </button>
 
 <div id="scanner" class="hidden relative mb-4">
-  <video id="video" playsinline muted autoplay></video>
+  <video id="video" playsinline muted></video>
   <div class="scan-overlay"></div>
   <button onclick="stopScanner()"
     class="w-full text-center text-red-500 font-bold mt-2">
@@ -170,12 +167,21 @@ window.closeModal = () => {
   modal.classList.replace("flex","hidden");
 };
 
-/* ========= Scanner ========= */
+/* ========= Scanner（Safari完全対応） ========= */
 window.startScanner = async () => {
+  const video = document.getElementById("video");
   document.getElementById("scanner").classList.remove("hidden");
+
+  // 念のため完全停止
+  stopScanner();
+
+  const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+  const backCam =
+    devices.find(d => /back|rear|environment/i.test(d.label)) || devices[0];
+
   controls = await reader.decodeFromVideoDevice(
-    { facingMode:"environment" },
-    document.getElementById("video"),
+    backCam.deviceId,
+    video,
     (res) => {
       if(res){
         const code = res.getText();
@@ -190,7 +196,15 @@ window.startScanner = async () => {
 };
 
 window.stopScanner = () => {
-  if(controls){ controls.stop(); controls = null; }
+  if(controls){
+    controls.stop();
+    controls = null;
+  }
+  const video = document.getElementById("video");
+  if(video && video.srcObject){
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
   document.getElementById("scanner").classList.add("hidden");
 };
 
@@ -205,9 +219,9 @@ async function lookupISBN(code){
     document.getElementById("cover-url").value = s.cover || "";
 
     const p = document.getElementById("cover-preview");
-    if(s.cover){
-      p.innerHTML = `<img src="${s.cover}" class="h-full w-full object-contain">`;
-    }
+    p.innerHTML = s.cover
+      ? `<img src="${s.cover}" class="h-full w-full object-contain">`
+      : "表紙なし";
   }
 }
 
