@@ -10,19 +10,8 @@
 
 <style>
 body { font-family: "Noto Sans JP", sans-serif; background:#f8fafc; }
-#video {
-  width:100%;
-  height:240px;
-  background:#000;
-  object-fit:cover;
-  border-radius:12px;
-}
-.scan-overlay {
-  position:absolute;
-  inset:20% 10%;
-  border:2px solid red;
-  pointer-events:none;
-}
+video { width:100%; height:240px; object-fit:cover; border-radius:12px; background:#000; }
+.scan-overlay { position:absolute; inset:20% 10%; border:2px solid red; pointer-events:none; }
 </style>
 </head>
 
@@ -35,15 +24,15 @@ body { font-family: "Noto Sans JP", sans-serif; background:#f8fafc; }
 <main class="flex-grow max-w-6xl mx-auto p-4 w-full">
 
 <div class="flex gap-3 mb-4">
-  <input id="search" placeholder="検索"
+  <input id="searchInput" placeholder="タイトル・著者・ISBN検索"
     class="flex-grow border rounded-xl px-4 py-3">
-  <button onclick="openModal()"
+  <button id="openBtn"
     class="bg-slate-800 text-white px-5 rounded-xl font-bold">
     ＋登録
   </button>
 </div>
 
-<div id="book-grid"
+<div id="bookGrid"
   class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 
 </main>
@@ -55,46 +44,53 @@ body { font-family: "Noto Sans JP", sans-serif; background:#f8fafc; }
 
 <h2 class="font-bold text-lg mb-3">書籍登録</h2>
 
-<button onclick="startScanner()"
+<button id="scanBtn"
   class="w-full border-2 border-dashed py-4 rounded-xl font-bold mb-4">
   📷 バーコードスキャン
 </button>
 
-<div id="scanner" class="hidden relative mb-4">
+<div id="scannerBox" class="hidden relative mb-4">
   <video id="video" playsinline muted></video>
   <div class="scan-overlay"></div>
-  <button onclick="stopScanner()"
+  <button id="cancelScan"
     class="text-red-500 font-bold w-full mt-2">キャンセル</button>
 </div>
 
-<input id="isbn" placeholder="ISBN"
+<input id="isbnInput" placeholder="ISBN"
   class="w-full border px-4 py-2 rounded-xl mb-2">
-<input id="title" placeholder="タイトル"
+<input id="titleInput" placeholder="タイトル"
   class="w-full border px-4 py-2 rounded-xl mb-2 font-bold">
-<input id="author" placeholder="著者"
+<input id="authorInput" placeholder="著者"
   class="w-full border px-4 py-2 rounded-xl mb-2">
 
-<input type="hidden" id="cover-url">
+<input type="hidden" id="coverUrl">
 
-<div id="cover-preview"
+<div id="coverPreview"
   class="h-40 bg-slate-100 rounded-xl flex items-center justify-center mb-4 text-slate-400">
   表紙プレビュー
 </div>
 
-<button onclick="addBook()"
-  class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">
-  登録
-</button>
+<div class="flex gap-3">
+  <button id="closeBtn"
+    class="flex-1 bg-slate-200 py-3 rounded-xl font-bold">キャンセル</button>
+  <button id="saveBtn"
+    class="flex-1 bg-slate-800 text-white py-3 rounded-xl font-bold">
+    登録
+  </button>
+</div>
 
 </div>
 </div>
 
 <script type="module">
-/* ===== ZXing ===== */
+/* ========= util ========= */
+const $ = id => document.getElementById(id);
+
+/* ========= ZXing ========= */
 import { BrowserMultiFormatReader }
 from "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.4/+esm";
 
-/* ===== Firebase ===== */
+/* ========= Firebase ========= */
 import { initializeApp }
 from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, signInAnonymously }
@@ -115,12 +111,12 @@ initializeApp(firebaseConfig);
 signInAnonymously(getAuth());
 const db = getFirestore();
 
-/* ===== State ===== */
+/* ========= State ========= */
 const reader = new BrowserMultiFormatReader();
 let controls = null;
 let books = [];
 
-/* ===== Firestore ===== */
+/* ========= Firestore ========= */
 onSnapshot(
   query(collection(db,"books"), orderBy("createdAt","desc")),
   snap => {
@@ -129,101 +125,112 @@ onSnapshot(
   }
 );
 
-/* ===== UI ===== */
-window.openModal = () => modal.classList.replace("hidden","flex");
-window.closeModal = () => { stopScanner(); modal.classList.replace("flex","hidden"); };
-
+/* ========= Render ========= */
 function render(){
-  const q = search.value.toLowerCase();
-  book-grid.innerHTML = "";
+  const q = $("searchInput").value.toLowerCase();
+  $("bookGrid").innerHTML = "";
+
   books.filter(b =>
     !q ||
     b.title.toLowerCase().includes(q) ||
     b.author.toLowerCase().includes(q) ||
     b.isbn.includes(q)
   ).forEach(b=>{
-    book-grid.innerHTML += `
-    <div class="bg-white rounded-xl p-4 shadow">
-      <div class="h-48 bg-slate-100 rounded mb-2 flex items-center justify-center overflow-hidden">
-        ${b.coverUrl ? `<img src="${b.coverUrl}" class="h-full w-full object-contain">` : "No Image"}
+    $("bookGrid").insertAdjacentHTML("beforeend",`
+      <div class="bg-white rounded-xl p-4 shadow">
+        <div class="h-48 bg-slate-100 rounded mb-2 flex items-center justify-center overflow-hidden">
+          ${b.coverUrl ? `<img src="${b.coverUrl}" class="h-full w-full object-contain">` : "No Image"}
+        </div>
+        <div class="font-bold">${b.title}</div>
+        <div class="text-sm text-slate-500">${b.author}</div>
+        <div class="text-xs text-slate-400">${b.isbn}</div>
       </div>
-      <div class="font-bold">${b.title}</div>
-      <div class="text-sm text-slate-500">${b.author}</div>
-      <div class="text-xs text-slate-400">${b.isbn}</div>
-    </div>`;
+    `);
   });
 }
-search.addEventListener("input", render);
+$("searchInput").addEventListener("input", render);
 
-/* ===== Scanner (Safari完全対応) ===== */
-window.startScanner = async () => {
-  scanner.classList.remove("hidden");
+/* ========= Modal ========= */
+$("openBtn").onclick = () => $("modal").classList.replace("hidden","flex");
+$("closeBtn").onclick = stopAndClose;
+
+/* ========= Scanner ========= */
+$("scanBtn").onclick = startScanner;
+$("cancelScan").onclick = stopScanner;
+
+async function startScanner(){
+  $("scannerBox").classList.remove("hidden");
   stopScanner();
 
-  try {
-    // ★ 明示的にカメラ許可を取る（Safari必須）
+  try{
     const stream = await navigator.mediaDevices.getUserMedia({
       video:{ facingMode:"environment" }, audio:false
     });
-    video.srcObject = stream;
-    await video.play();
+    $("video").srcObject = stream;
+    await $("video").play();
 
     const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-    const back = devices.find(d=>/back|rear|environment/i.test(d.label)) || devices[0];
+    const cam = devices.find(d=>/back|rear|environment/i.test(d.label)) || devices[0];
 
     controls = await reader.decodeFromVideoDevice(
-      back.deviceId,
-      video,
-      res=>{
-        if(res){
-          const code = res.getText();
+      cam.deviceId,
+      $("video"),
+      result=>{
+        if(result){
+          const code = result.getText();
           if(/^97[89]\d{10}$/.test(code)){
-            isbn.value = code;
+            $("isbnInput").value = code;
             stopScanner();
             lookupISBN(code);
           }
         }
       }
     );
-  } catch(e){
-    alert("カメラを起動できません。\nSafariの設定を確認してください。");
+  }catch(e){
+    alert("カメラを起動できません（Safari設定確認）");
     stopScanner();
   }
-};
+}
 
-window.stopScanner = () => {
+function stopScanner(){
   if(controls){ controls.stop(); controls=null; }
-  if(video.srcObject){
-    video.srcObject.getTracks().forEach(t=>t.stop());
-    video.srcObject=null;
+  const v = $("video");
+  if(v.srcObject){
+    v.srcObject.getTracks().forEach(t=>t.stop());
+    v.srcObject=null;
   }
-  scanner.classList.add("hidden");
-};
+  $("scannerBox").classList.add("hidden");
+}
 
-/* ===== OpenBD ===== */
-async function lookupISBN(code){
-  const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${code}`);
+function stopAndClose(){
+  stopScanner();
+  $("modal").classList.replace("flex","hidden");
+}
+
+/* ========= OpenBD ========= */
+async function lookupISBN(isbn){
+  const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
   const d = await r.json();
   if(d && d[0]?.summary){
     const s = d[0].summary;
-    title.value = s.title || "";
-    author.value = s.author || "";
-    cover-url.value = s.cover || "";
-    cover-preview.innerHTML =
+    $("titleInput").value = s.title || "";
+    $("authorInput").value = s.author || "";
+    $("coverUrl").value = s.cover || "";
+    $("coverPreview").innerHTML =
       s.cover ? `<img src="${s.cover}" class="h-full w-full object-contain">` : "表紙なし";
   }
 }
 
-/* ===== Add ===== */
-window.addBook = async ()=>{
+/* ========= Save ========= */
+$("saveBtn").onclick = async ()=>{
   await addDoc(collection(db,"books"),{
-    isbn:isbn.value,
-    title:title.value,
-    author:author.value||"不明",
-    coverUrl:cover-url.value||"",
-    createdAt:new Date()
+    isbn: $("isbnInput").value,
+    title: $("titleInput").value,
+    author: $("authorInput").value || "不明",
+    coverUrl: $("coverUrl").value || "",
+    createdAt: new Date()
   });
-  closeModal();
+  stopAndClose();
 };
 </script>
 
