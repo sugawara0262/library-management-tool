@@ -96,14 +96,14 @@ video {
 </div>
 
 <script type="module">
-/* ===== util ===== */
+/* ========= util ========= */
 const $ = id => document.getElementById(id);
 
-/* ===== ZXing ===== */
+/* ========= ZXing ========= */
 import { BrowserMultiFormatReader }
 from "https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.4/+esm";
 
-/* ===== Firebase ===== */
+/* ========= Firebase ========= */
 import { initializeApp }
 from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, signInAnonymously }
@@ -124,12 +124,12 @@ initializeApp(firebaseConfig);
 signInAnonymously(getAuth());
 const db = getFirestore();
 
-/* ===== State ===== */
+/* ========= State ========= */
 const reader = new BrowserMultiFormatReader();
 let controls = null;
 let books = [];
 
-/* ===== Firestore ===== */
+/* ========= Firestore ========= */
 onSnapshot(
   query(collection(db,"books"), orderBy("createdAt","desc")),
   snap => {
@@ -138,7 +138,7 @@ onSnapshot(
   }
 );
 
-/* ===== Render ===== */
+/* ========= Render ========= */
 function render(){
   const q = $("searchInput").value.toLowerCase();
   $("bookGrid").innerHTML = "";
@@ -163,41 +163,54 @@ function render(){
 }
 $("searchInput").addEventListener("input", render);
 
-/* ===== Modal ===== */
+/* ========= Modal ========= */
 $("openBtn").onclick = () => $("modal").classList.replace("hidden","flex");
 $("closeBtn").onclick = closeModal;
 
-/* ===== Scanner ===== */
+/* ========= Scanner（背面カメラ強制） ========= */
 $("scanBtn").onclick = startScanner;
 $("cancelScan").onclick = stopScanner;
 
 async function startScanner(){
   stopScanner();
-
   $("scannerBox").classList.remove("hidden");
 
-  /* Safari対策：DOM反映を確実に待つ */
+  // Safari描画待ち
   await new Promise(r => requestAnimationFrame(r));
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise(r => setTimeout(r, 60));
 
-  try{
+  try {
+    /* ① まず environment で許可取得（iOS必須） */
+    const tmp = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ exact:"environment" } },
+      audio:false
+    });
+    tmp.getTracks().forEach(t=>t.stop());
+
+    /* ② カメラ一覧取得 */
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videos = devices.filter(d=>d.kind==="videoinput");
+
+    /* ③ 背面カメラ特定（iPhone対応） */
+    const backCam =
+      videos.find(d=>/back|rear|environment/i.test(d.label))
+      || videos[videos.length-1];
+
+    /* ④ 背面カメラを deviceId で起動 */
     const stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:"environment" }, audio:false
+      video:{ deviceId:{ exact: backCam.deviceId } },
+      audio:false
     });
 
     const video = $("video");
     video.srcObject = stream;
     video.setAttribute("playsinline","");
     video.muted = true;
-
     await video.play();
 
-    const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-    const cam =
-      devices.find(d=>/back|rear|environment/i.test(d.label)) || devices[0];
-
+    /* ⑤ ZXing 読み取り */
     controls = await reader.decodeFromVideoDevice(
-      cam.deviceId,
+      backCam.deviceId,
       video,
       result=>{
         if(result){
@@ -210,8 +223,9 @@ async function startScanner(){
         }
       }
     );
-  }catch(e){
-    alert("カメラを起動できません。Safariの設定を確認してください。");
+
+  } catch (e) {
+    alert("背面カメラを起動できません（Safari設定を確認）");
     stopScanner();
   }
 }
@@ -221,7 +235,7 @@ function stopScanner(){
   const v = $("video");
   if(v.srcObject){
     v.srcObject.getTracks().forEach(t=>t.stop());
-    v.srcObject = null;
+    v.srcObject=null;
   }
   $("scannerBox").classList.add("hidden");
 }
@@ -231,7 +245,7 @@ function closeModal(){
   $("modal").classList.replace("flex","hidden");
 }
 
-/* ===== OpenBD ===== */
+/* ========= OpenBD ========= */
 async function lookupISBN(isbn){
   const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
   const d = await r.json();
@@ -245,7 +259,7 @@ async function lookupISBN(isbn){
   }
 }
 
-/* ===== Save ===== */
+/* ========= Save ========= */
 $("saveBtn").onclick = async ()=>{
   await addDoc(collection(db,"books"),{
     isbn: $("isbnInput").value,
