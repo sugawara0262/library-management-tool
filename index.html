@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>蔵書管理システム Pro</title>
+<title>蔵書管理システム Pro（安定版）</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
@@ -15,40 +15,39 @@
 
 <body class="bg-slate-100">
 
-<header class="bg-white shadow p-4 font-bold text-lg">
-📚 蔵書管理システム Pro
+<header class="bg-white shadow p-4 font-bold">
+📚 蔵書管理システム Pro（安定版）
 </header>
 
-<div class="p-4 space-y-3">
+<main class="p-4 space-y-3">
 
-<input id="searchInput" placeholder="管理番号・ISBN・タイトルで検索"
- class="w-full border p-2 rounded" oninput="renderBooks()">
+<input id="searchInput" placeholder="管理番号・ISBN・タイトル検索"
+ class="w-full border p-2 rounded">
 
 <div class="flex flex-wrap gap-2">
-<button onclick="openModal()" class="bg-slate-800 text-white px-4 py-2 rounded">
+<button id="addBtn" class="bg-slate-800 text-white px-4 py-2 rounded">
 ＋ 新規登録
 </button>
 
-<button onclick="exportCSV()" class="border px-4 py-2 rounded">
-CSV出力
-</button>
+<button id="csvOut" class="border px-4 py-2 rounded">CSV出力</button>
 
 <label class="border px-4 py-2 rounded cursor-pointer">
 CSV取込
-<input type="file" accept=".csv" hidden onchange="importCSV(this)">
+<input type="file" accept=".csv" hidden id="csvIn">
 </label>
 </div>
 
 <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-</div>
+
+</main>
 
 <!-- Modal -->
 <div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
 <div class="bg-white p-4 rounded w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto">
 
-<h2 class="font-bold text-lg">書籍登録</h2>
+<h2 class="font-bold">書籍登録</h2>
 
-<button onclick="startScanner()" class="border w-full py-2 rounded">
+<button id="scanBtn" class="border w-full py-2 rounded">
 📷 バーコードスキャン
 </button>
 
@@ -57,42 +56,31 @@ CSV取込
 <input id="mcNumber" placeholder="管理番号（10桁）" class="border p-2 w-full rounded">
 <input id="isbn" placeholder="ISBN" class="border p-2 w-full rounded">
 
-<button onclick="lookupISBN()" class="border w-full py-1 rounded">
-ISBNから情報取得
-</button>
+<button id="isbnBtn" class="border w-full py-1 rounded">ISBN取得</button>
 
 <input id="title" placeholder="タイトル" class="border p-2 w-full rounded">
 <input id="author" placeholder="著者" class="border p-2 w-full rounded">
 
-<!-- 表紙画像 -->
 <div class="space-y-2">
-  <div class="text-sm font-bold">表紙画像</div>
+<div class="font-bold text-sm">表紙画像</div>
 
-  <div id="coverPreview"
-       class="h-40 bg-slate-100 rounded flex items-center justify-center overflow-hidden">
-    <span class="text-slate-400 text-sm">No Image</span>
-  </div>
-
-  <input id="coverInput"
-         placeholder="表紙画像URL（自動 / 手動）"
-         class="border p-2 w-full rounded"
-         oninput="updateCoverPreview(this.value)">
-
-  <label class="border p-2 rounded w-full block text-center cursor-pointer">
-    📷 画像を選択（iPhone対応）
-    <input type="file" accept="image/*" hidden onchange="uploadCover(this)">
-  </label>
+<div id="coverPreview"
+ class="h-40 bg-slate-100 rounded flex items-center justify-center overflow-hidden">
+<span class="text-slate-400">No Image</span>
 </div>
 
-<input type="hidden" id="cover">
+<input id="coverInput" placeholder="表紙URL"
+ class="border p-2 w-full rounded">
+
+<label class="border p-2 rounded w-full block text-center cursor-pointer">
+📷 画像を選択
+<input type="file" accept="image/*" hidden id="coverFile">
+</label>
+</div>
 
 <div class="flex gap-2 pt-2">
-<button onclick="closeModal()" class="flex-1 border rounded py-2">
-キャンセル
-</button>
-<button onclick="saveBook()" class="flex-1 bg-slate-800 text-white rounded py-2">
-保存
-</button>
+<button id="cancelBtn" class="flex-1 border rounded py-2">キャンセル</button>
+<button id="saveBtn" class="flex-1 bg-slate-800 text-white rounded py-2">保存</button>
 </div>
 
 </div>
@@ -103,29 +91,29 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebas
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-const firebaseConfig={
+/* ===== Firebase ===== */
+const app = initializeApp({
  apiKey:"AIzaSyChSeXTRYpykQkMmcDj041nlq-Nkt03oC4",
  authDomain:"library-management-tool-31dcd.firebaseapp.com",
  projectId:"library-management-tool-31dcd"
-};
+});
+signInAnonymously(getAuth(app));
+const db = getFirestore(app);
 
-const app=initializeApp(firebaseConfig);
-const auth=getAuth(app);
-const db=getFirestore(app);
-signInAnonymously(auth);
+/* ===== State ===== */
+let books = [];
+const UI = { editingId:null, scanning:false, importing:false };
 
-let books=[],editingId=null;
+/* ===== Snapshot ===== */
+onSnapshot(query(collection(db,"books"),orderBy("createdAt","desc")),snap=>{
+ if(UI.importing) return;
+ books = snap.docs.map(d=>({id:d.id,...d.data()}));
+ renderBooks();
+});
 
-onSnapshot(
- query(collection(db,"books"),orderBy("createdAt","desc")),
- snap=>{
-  books=snap.docs.map(d=>({id:d.id,...d.data()}));
-  renderBooks();
- }
-);
-
-window.renderBooks=()=>{
- const q=searchInput.value;
+/* ===== Render ===== */
+function renderBooks(){
+ const q = searchInput.value;
  grid.innerHTML="";
  books.filter(b=>
   b.mcNumber?.includes(q)||
@@ -134,109 +122,104 @@ window.renderBooks=()=>{
  ).forEach(b=>{
   grid.innerHTML+=`
 <div class="bg-white p-3 rounded shadow">
-<div class="h-32 bg-slate-100 flex justify-center items-center mb-2">
+<div class="h-32 bg-slate-100 flex items-center justify-center mb-2">
 ${b.cover?`<img src="${b.cover}" class="h-full object-contain">`:"No Image"}
 </div>
 <p class="font-bold text-sm">${b.title}</p>
 <p class="text-sm">${b.author||""}</p>
-<p class="text-xs text-slate-500">管理番号：${b.mcNumber}</p>
+<p class="text-xs">管理番号：${b.mcNumber}</p>
 <div class="flex gap-2 mt-2 text-sm">
 <button onclick="editBook('${b.id}')" class="border flex-1">編集</button>
-<button onclick="deleteBook('${b.id}')" class="border flex-1 text-red-500">削除</button>
+<button onclick="removeBook('${b.id}')" class="border flex-1 text-red-500">削除</button>
 </div>
 </div>`;
  });
-};
+}
 
-window.openModal=()=>modal.classList.replace("hidden","flex");
+/* ===== Modal ===== */
+addBtn.onclick=()=>openModal();
+cancelBtn.onclick=()=>closeModal();
 
-window.closeModal=()=>{
+function openModal(){
+ modal.classList.replace("hidden","flex");
+}
+function closeModal(){
  modal.classList.replace("flex","hidden");
  stopScanner();
- editingId=null;
- coverInput.value="";
- updateCoverPreview("");
-};
+ UI.editingId=null;
+ resetForm();
+}
 
-window.editBook=id=>{
- const b=books.find(x=>x.id===id);
- editingId=id;
- mcNumber.value=b.mcNumber;
- isbn.value=b.isbn;
- title.value=b.title;
- author.value=b.author;
- cover.value=b.cover||"";
- coverInput.value=b.cover||"";
- updateCoverPreview(b.cover||"");
- openModal();
-};
-
-window.saveBook=async()=>{
- if(!/^\d{10}$/.test(mcNumber.value))
-  return alert("管理番号は数字10桁です");
-
- if(books.some(b=>b.mcNumber===mcNumber.value&&b.id!==editingId))
-  return alert("管理番号が重複しています");
+/* ===== CRUD ===== */
+saveBtn.onclick=async()=>{
+ if(!/^\d{10}$/.test(mcNumber.value)) return alert("管理番号は10桁");
+ if(books.some(b=>b.mcNumber===mcNumber.value&&b.id!==UI.editingId))
+  return alert("管理番号重複");
 
  const data={
   mcNumber:mcNumber.value,
   isbn:isbn.value,
   title:title.value,
   author:author.value,
-  cover:cover.value,
+  cover:coverInput.value,
   updatedAt:new Date()
  };
 
- if(editingId)
-  await updateDoc(doc(db,"books",editingId),data);
+ if(UI.editingId)
+  await updateDoc(doc(db,"books",UI.editingId),data);
  else
   await addDoc(collection(db,"books"),{...data,createdAt:new Date()});
 
  closeModal();
 };
 
-window.deleteBook=async id=>{
+window.editBook=id=>{
+ const b=books.find(x=>x.id===id);
+ UI.editingId=id;
+ mcNumber.value=b.mcNumber;
+ isbn.value=b.isbn;
+ title.value=b.title;
+ author.value=b.author;
+ coverInput.value=b.cover||"";
+ updateCover(b.cover||"");
+ openModal();
+};
+
+window.removeBook=async id=>{
  if(confirm("削除しますか？"))
   await deleteDoc(doc(db,"books",id));
 };
 
-window.lookupISBN=async()=>{
+/* ===== ISBN ===== */
+isbnBtn.onclick=async()=>{
  const i=isbn.value.replace(/[^0-9]/g,"");
- if(!i)return;
  const r=await fetch(`https://api.openbd.jp/v1/get?isbn=${i}`);
  const d=await r.json();
  if(d[0]){
   title.value=d[0].summary.title||"";
   author.value=d[0].summary.author||"";
-  const c=d[0].summary.cover||"";
-  cover.value=c;
-  coverInput.value=c;
-  updateCoverPreview(c);
+  coverInput.value=d[0].summary.cover||"";
+  updateCover(coverInput.value);
  }
 };
 
-window.updateCoverPreview=url=>{
- const p=coverPreview;
- p.innerHTML=url
-  ? `<img src="${url}" class="h-full object-contain">`
-  : `<span class="text-slate-400">No Image</span>`;
- cover.value=url;
-};
-
-window.uploadCover=input=>{
- const file=input.files[0];
- if(!file)return;
+/* ===== Cover ===== */
+coverInput.oninput=()=>updateCover(coverInput.value);
+coverFile.onchange=e=>{
  const r=new FileReader();
- r.onload=e=>{
-  cover.value=e.target.result;
-  updateCoverPreview(e.target.result);
+ r.onload=ev=>{
+  coverInput.value=ev.target.result;
+  updateCover(ev.target.result);
  };
- r.readAsDataURL(file);
+ r.readAsDataURL(e.target.files[0]);
 };
+function updateCover(url){
+ coverPreview.innerHTML=url?`<img src="${url}" class="h-full object-contain">`:"No Image";
+}
 
-let scanning=false;
-window.startScanner=()=>{
- if(scanning)return;
+/* ===== Scanner ===== */
+scanBtn.onclick=()=>{
+ if(UI.scanning) return;
  scanner.classList.remove("hidden");
  Quagga.init({
   inputStream:{
@@ -246,54 +229,60 @@ window.startScanner=()=>{
   },
   decoder:{readers:["ean_reader"]}
  },err=>{
-  if(err)return alert("カメラ起動失敗");
+  if(err) return alert("カメラ起動失敗");
   Quagga.start();
-  scanning=true;
+  UI.scanning=true;
  });
  Quagga.onDetected(r=>{
   const c=r.codeResult.code;
   if(/^97[89]\d{10}$/.test(c)){
    isbn.value=c;
    stopScanner();
-   lookupISBN();
+   isbnBtn.onclick();
   }
  });
 };
-
-window.stopScanner=()=>{
- if(scanning){
+function stopScanner(){
+ if(UI.scanning){
   Quagga.stop();
   Quagga.offDetected();
  }
- scanning=false;
+ UI.scanning=false;
  scanner.classList.add("hidden");
-};
+}
 
-window.exportCSV=()=>{
+/* ===== CSV ===== */
+csvOut.onclick=()=>{
  let csv="管理番号,ISBN,タイトル,著者,表紙\n";
- books.forEach(b=>{
-  csv+=`${b.mcNumber},${b.isbn},${b.title},${b.author},${b.cover||""}\n`;
- });
+ books.forEach(b=>csv+=`${b.mcNumber},${b.isbn},${b.title},${b.author},${b.cover||""}\n`);
  const a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+ a.href=URL.createObjectURL(new Blob([csv]));
  a.download="books.csv";
  a.click();
 };
 
-window.importCSV=async input=>{
- const text=await input.files[0].text();
+csvIn.onchange=async e=>{
+ UI.importing=true;
+ const text=await e.target.files[0].text();
  for(const l of text.split("\n").slice(1)){
-  if(!l.trim())continue;
+  if(!l.trim()) continue;
   const [mc,isbn,title,author,cover]=l.split(",");
-  if(!/^\d{10}$/.test(mc))continue;
-  if(books.some(b=>b.mcNumber===mc))continue;
+  if(!/^\d{10}$/.test(mc)) continue;
+  if(books.some(b=>b.mcNumber===mc)) continue;
   await addDoc(collection(db,"books"),{
-   mcNumber:mc,isbn,title,author,cover,
-   createdAt:new Date()
+   mcNumber:mc,isbn,title,author,cover,createdAt:new Date()
   });
  }
+ UI.importing=false;
  alert("CSV取込完了");
 };
+
+/* ===== Utils ===== */
+function resetForm(){
+ mcNumber.value=isbn.value=title.value=author.value=coverInput.value="";
+ updateCover("");
+}
+searchInput.oninput=renderBooks;
 </script>
 
 </body>
