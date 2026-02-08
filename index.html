@@ -2,207 +2,211 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>蔵書管理 Ver.3 + 棚卸</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>蔵書管理＋棚卸</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
-<style>
-body{font-family:'Noto Sans JP',sans-serif}
-#interactive{height:240px;background:#000;border-radius:8px;overflow:hidden}
-#interactive video{width:100%;height:100%;object-fit:cover}
-.scan-line{position:absolute;left:10%;right:10%;top:50%;height:2px;background:red}
-</style>
-</head>
+<!-- QuaggaJS -->
+<script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
 
-<body class="bg-slate-100 min-h-screen">
-
-<header class="bg-white shadow sticky top-0 z-10">
-  <div class="px-4 py-3 flex justify-between items-center">
-    <h1 class="font-bold text-xl flex items-center gap-2">
-      <span class="material-icons-round">library_books</span>蔵書管理
-    </h1>
-    <div class="flex items-center gap-3">
-      <label class="text-sm flex items-center gap-1">
-        <input type="checkbox" id="toggleInventory">
-        棚卸モード
-      </label>
-      <button onclick="openModal()" class="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-1">
-        <span class="material-icons-round text-sm">add</span>登録
-      </button>
-    </div>
-  </div>
-</header>
-
-<main class="p-4 max-w-6xl mx-auto">
-  <div id="inventoryScanner" class="hidden mb-4 relative">
-    <div id="interactive"><div class="scan-line"></div></div>
-    <p class="text-xs text-center mt-1">棚卸：実物のバーコードを読み取ってください</p>
-  </div>
-  <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
-</main>
-
-<!-- 登録モーダル（完全復元） -->
-<div id="modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center p-4 z-50">
-<div class="bg-white w-full max-w-md rounded-2xl p-5 max-h-[90vh] overflow-y-auto">
-
-<h2 class="font-bold text-lg mb-4">書籍登録 / 編集</h2>
-
-<button onclick="toggleRegScanner()" class="w-full border rounded-lg p-3 mb-3 flex justify-center gap-2">
-  <span class="material-icons-round">qr_code_scanner</span> バーコードスキャン
-</button>
-
-<div id="regScanner" class="hidden mb-3 relative">
-  <div id="interactive"><div class="scan-line"></div></div>
-</div>
-
-<input id="isbn" placeholder="ISBN" class="w-full border p-2 mb-2">
-<button onclick="lookupISBN()" class="w-full bg-slate-200 rounded p-2 mb-2">ISBN情報取得</button>
-
-<input id="mc" placeholder="管理番号（10桁）" class="w-full border p-2 mb-2" maxlength="10">
-<input id="title" placeholder="タイトル" class="w-full border p-2 mb-2">
-<input id="author" placeholder="著者" class="w-full border p-2 mb-2">
-<input type="hidden" id="cover">
-
-<div id="preview" class="h-40 border flex items-center justify-center mb-4 text-slate-400">No Image</div>
-
-<div class="flex gap-2">
-  <button onclick="closeModal()" class="flex-1 border rounded p-2">キャンセル</button>
-  <button onclick="saveBook()" class="flex-1 bg-slate-800 text-white rounded p-2">保存</button>
-</div>
-
-</div>
-</div>
-
+<!-- Firebase -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot,
-  query, orderBy, doc, updateDoc, deleteDoc } from
-"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, query, where
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const app = initializeApp({
-  apiKey:"AIzaSyChSeXTRYpykQkMmcDj041nlq-Nkt03oC4",
-  authDomain:"library-management-tool-31dcd.firebaseapp.com",
-  projectId:"library-management-tool-31dcd"
-});
+/* 🔴 あなたのFirebase設定に差し替え */
+const firebaseConfig = {
+  apiKey: "XXXX",
+  authDomain: "XXXX",
+  projectId: "XXXX",
+};
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const grid=document.getElementById("grid");
-const toggleInventory=document.getElementById("toggleInventory");
-const inventoryScanner=document.getElementById("inventoryScanner");
+/* =========================
+   状態
+========================= */
+let books = [];
+let inventoryMode = false;
 
-let books=[],inventoryMode=false,editingId=null,scanning=false;
+/* =========================
+   DOM
+========================= */
+const grid = document.getElementById("grid");
+const toggleInventory = document.getElementById("inventoryToggle");
+const scannerBox = document.getElementById("scanner");
 
-/* Firestore */
-onSnapshot(query(collection(db,"books"),orderBy("updatedAt","desc")),snap=>{
-  books=snap.docs.map(d=>({id:d.id,...d.data()}));
-  render();
-});
+/* =========================
+   ISBN検索（画像修正版）
+========================= */
+window.fetchFromISBN = async ()=>{
+  const isbn = document.getElementById("isbn").value.trim();
+  if(!isbn) return alert("ISBNを入力してください");
 
-/* Render */
-function render(){
-  grid.innerHTML="";
-  inventoryMode
-    ? books.filter(b=>!b.inventoryCheckedAt).forEach(renderInventory)
-    : books.forEach(renderNormal);
-}
-function renderNormal(b){
-  grid.innerHTML+=`
-  <div class="bg-white rounded shadow p-2">
-    <div class="h-32 bg-slate-100 flex items-center justify-center mb-2">
-      ${b.cover?`<img src="${b.cover}" class="h-full object-contain">`:"No Image"}
-    </div>
-    <p class="font-bold text-sm">${b.title||""}</p>
-    <p class="text-xs text-slate-500">${b.author||""}</p>
-    <p class="text-[10px] mt-1">管理番号:${b.mcNumber||"-"}</p>
-    <div class="flex gap-1 mt-2 text-xs">
-      <button onclick="editBook('${b.id}')" class="flex-1 border rounded">編集</button>
-      <button onclick="deleteBook('${b.id}')" class="flex-1 border rounded text-red-500">削除</button>
-    </div>
-  </div>`;
-}
-function renderInventory(b){
-  grid.innerHTML+=`
-  <div class="bg-yellow-50 border p-2 rounded">
-    <p class="font-bold text-sm">${b.title||""}</p>
-    <p class="text-xs text-red-500">未棚卸</p>
-  </div>`;
-}
+  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+  const data = await res.json();
 
-/* 棚卸モード */
-toggleInventory.onchange=()=>{
-  inventoryMode=toggleInventory.checked;
-  inventoryScanner.classList.toggle("hidden",!inventoryMode);
-  inventoryMode?startInventoryScanner():stopScanner();
-  render();
+  if(!data.items){
+    alert("書籍情報が見つかりません");
+    return;
+  }
+
+  const v = data.items[0].volumeInfo;
+  document.getElementById("title").value = v.title || "";
+  document.getElementById("author").value = (v.authors||[]).join(",");
+
+  /* 🔧 画像取得 修正ポイント */
+  let img = "";
+  if(v.imageLinks){
+    img = v.imageLinks.thumbnail || v.imageLinks.smallThumbnail || "";
+    img = img.replace("http://","https://");
+  }
+  document.getElementById("cover").value = img;
 };
 
-/* スキャナー */
-function startInventoryScanner(){
+/* =========================
+   管理番号重複チェック
+========================= */
+async function checkDuplicate(mc){
+  const q = query(collection(db,"books"),where("mcNumber","==",mc));
+  const snap = await getDocs(q);
+  return !snap.empty;
+}
+
+/* =========================
+   登録
+========================= */
+window.addBook = async ()=>{
+  const mc = document.getElementById("mcNumber").value.trim();
+  if(!/^\d{10}$/.test(mc)) return alert("管理番号は10桁数字");
+
+  if(await checkDuplicate(mc)){
+    return alert("管理番号が重複しています");
+  }
+
+  await addDoc(collection(db,"books"),{
+    mcNumber: mc,
+    isbn: document.getElementById("isbn").value,
+    title: document.getElementById("title").value,
+    author: document.getElementById("author").value,
+    cover: document.getElementById("cover").value,
+    inventoryCheckedAt: null
+  });
+  load();
+};
+
+/* =========================
+   読み込み
+========================= */
+async function load(){
+  const snap = await getDocs(collection(db,"books"));
+  books = snap.docs.map(d=>({id:d.id,...d.data()}));
+  render();
+}
+
+/* =========================
+   描画
+========================= */
+function render(){
+  grid.innerHTML="";
+  inventoryMode ? renderInventory() : renderNormal();
+}
+
+function renderNormal(){
+  books.forEach(b=>{
+    grid.innerHTML+=`
+    <div class="bg-white rounded shadow overflow-hidden">
+      <div class="h-40 bg-gray-100 flex items-center justify-center">
+        ${b.cover ? `<img src="${b.cover}" class="h-full object-contain">` : "No Image"}
+      </div>
+      <div class="p-2">
+        <p class="font-bold text-sm">${b.title}</p>
+        <p class="text-xs text-gray-500">${b.author}</p>
+        <p class="text-[10px] mt-1">管理番号：${b.mcNumber}</p>
+      </div>
+    </div>`;
+  });
+}
+
+function renderInventory(){
+  books.filter(b=>!b.inventoryCheckedAt).forEach(b=>{
+    grid.innerHTML+=`
+    <div class="border p-2 bg-yellow-50">
+      <p class="font-bold text-sm">${b.title}</p>
+      <p class="text-xs text-red-500">未棚卸</p>
+    </div>`;
+  });
+}
+
+/* =========================
+   棚卸スキャン
+========================= */
+function startScanner(){
   Quagga.init({
-    inputStream:{type:"LiveStream",target:"#interactive",constraints:{facingMode:"environment"}},
+    inputStream:{
+      type:"LiveStream",
+      target:scannerBox,
+      constraints:{facingMode:"environment"}
+    },
     decoder:{readers:["ean_reader"]}
-  },()=>{Quagga.start();scanning=true;});
-  Quagga.onDetected(async r=>{
-    const code=r.codeResult.code;
-    const b=books.find(x=>x.isbn===code);
-    if(b){
-      await updateDoc(doc(db,"books",b.id),{
-        inventoryCheckedAt:new Date(),updatedAt:new Date()
+  },err=>{
+    if(!err) Quagga.start();
+  });
+
+  Quagga.onDetected(async d=>{
+    const code = d.codeResult.code;
+    const hit = books.find(b=>b.isbn===code);
+    if(hit){
+      await updateDoc(doc(db,"books",hit.id),{
+        inventoryCheckedAt:new Date()
       });
+      load();
     }
   });
 }
+
 function stopScanner(){
-  if(scanning){Quagga.stop();Quagga.offDetected();}
-  scanning=false;
+  Quagga.stop();
 }
 
-/* 登録 */
-window.saveBook=async()=>{
-  if(!/^\d{10}$/.test(mc.value)){alert("管理番号10桁");return;}
-  const data={
-    isbn:isbn.value,mcNumber:mc.value,title:title.value,
-    author:author.value,cover:cover.value,
-    updatedAt:new Date()
-  };
-  editingId
-    ? await updateDoc(doc(db,"books",editingId),data)
-    : await addDoc(collection(db,"books"),{...data,createdAt:new Date()});
-  closeModal();
+/* =========================
+   棚卸切替
+========================= */
+toggleInventory.onchange=()=>{
+  inventoryMode = toggleInventory.checked;
+  scannerBox.classList.toggle("hidden",!inventoryMode);
+  inventoryMode ? startScanner() : stopScanner();
+  render();
 };
 
-window.editBook=id=>{
-  const b=books.find(x=>x.id===id); if(!b)return;
-  editingId=id;
-  isbn.value=b.isbn||"";mc.value=b.mcNumber||"";
-  title.value=b.title||"";author.value=b.author||"";
-  cover.value=b.cover||"";
-  preview.innerHTML=b.cover?`<img src="${b.cover}" class="h-full object-contain">`:"No Image";
-  openModal();
-};
-window.deleteBook=id=>confirm("削除しますか？")&&deleteDoc(doc(db,"books",id));
-
-/* ISBN取得 */
-window.lookupISBN=async()=>{
-  const i=isbn.value.replace(/\D/g,"");
-  const r=await fetch(`https://api.openbd.jp/v1/get?isbn=${i}`);
-  const d=await r.json();
-  if(d[0]?.summary){
-    title.value=d[0].summary.title||"";
-    author.value=d[0].summary.author||"";
-    cover.value=d[0].summary.cover||"";
-    preview.innerHTML=cover.value?`<img src="${cover.value}" class="h-full object-contain">`:"No Image";
-  }
-};
-
-/* モーダル */
-window.openModal=()=>modal.classList.replace("hidden","flex");
-window.closeModal=()=>{modal.classList.replace("flex","hidden");editingId=null;};
-window.toggleRegScanner=()=>alert("※登録用スキャンは後で統合可能");
+load();
 </script>
+</head>
+
+<body class="bg-slate-100 p-4">
+<h1 class="font-bold mb-2">📚 蔵書管理</h1>
+
+<!-- 登録画面（完全復活） -->
+<div class="bg-white p-3 rounded shadow mb-4">
+  <div class="flex gap-2">
+    <input id="isbn" placeholder="ISBN" class="border p-1 flex-1">
+    <button onclick="fetchFromISBN()" class="bg-blue-500 text-white px-2">取得</button>
+  </div>
+  <input id="title" placeholder="タイトル" class="border p-1 w-full mt-1">
+  <input id="author" placeholder="著者" class="border p-1 w-full mt-1">
+  <input id="cover" placeholder="画像URL" class="border p-1 w-full mt-1">
+  <input id="mcNumber" placeholder="管理番号(10桁)" class="border p-1 w-full mt-1">
+  <button onclick="addBook()" class="bg-green-600 text-white w-full mt-2">登録</button>
+</div>
+
+<label class="flex items-center gap-2 mb-2">
+  <input type="checkbox" id="inventoryToggle"> 棚卸モード
+</label>
+
+<div id="scanner" class="hidden mb-2"></div>
+
+<div id="grid" class="grid grid-cols-2 gap-2"></div>
 </body>
 </html>
