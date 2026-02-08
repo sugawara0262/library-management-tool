@@ -2,288 +2,209 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>蔵書管理システム Pro（安定版）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>蔵書管理（安定版）</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
-<style>
-#scanner video{width:100%;height:100%;object-fit:cover}
-</style>
-</head>
-
-<body class="bg-slate-100">
-
-<header class="bg-white shadow p-4 font-bold">
-📚 蔵書管理システム Pro（安定版）
-</header>
-
-<main class="p-4 space-y-3">
-
-<input id="searchInput" placeholder="管理番号・ISBN・タイトル検索"
- class="w-full border p-2 rounded">
-
-<div class="flex flex-wrap gap-2">
-<button id="addBtn" class="bg-slate-800 text-white px-4 py-2 rounded">
-＋ 新規登録
-</button>
-
-<button id="csvOut" class="border px-4 py-2 rounded">CSV出力</button>
-
-<label class="border px-4 py-2 rounded cursor-pointer">
-CSV取込
-<input type="file" accept=".csv" hidden id="csvIn">
-</label>
-</div>
-
-<div id="grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-
-</main>
-
-<!-- Modal -->
-<div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-<div class="bg-white p-4 rounded w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto">
-
-<h2 class="font-bold">書籍登録</h2>
-
-<button id="scanBtn" class="border w-full py-2 rounded">
-📷 バーコードスキャン
-</button>
-
-<div id="scanner" class="hidden h-48 bg-black rounded"></div>
-
-<input id="mcNumber" placeholder="管理番号（10桁）" class="border p-2 w-full rounded">
-<input id="isbn" placeholder="ISBN" class="border p-2 w-full rounded">
-
-<button id="isbnBtn" class="border w-full py-1 rounded">ISBN取得</button>
-
-<input id="title" placeholder="タイトル" class="border p-2 w-full rounded">
-<input id="author" placeholder="著者" class="border p-2 w-full rounded">
-
-<div class="space-y-2">
-<div class="font-bold text-sm">表紙画像</div>
-
-<div id="coverPreview"
- class="h-40 bg-slate-100 rounded flex items-center justify-center overflow-hidden">
-<span class="text-slate-400">No Image</span>
-</div>
-
-<input id="coverInput" placeholder="表紙URL"
- class="border p-2 w-full rounded">
-
-<label class="border p-2 rounded w-full block text-center cursor-pointer">
-📷 画像を選択
-<input type="file" accept="image/*" hidden id="coverFile">
-</label>
-</div>
-
-<div class="flex gap-2 pt-2">
-<button id="cancelBtn" class="flex-1 border rounded py-2">キャンセル</button>
-<button id="saveBtn" class="flex-1 bg-slate-800 text-white rounded py-2">保存</button>
-</div>
-
-</div>
-</div>
-
+<!-- Firebase -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, deleteDoc, doc,
+  onSnapshot, updateDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* ===== Firebase ===== */
-const app = initializeApp({
- apiKey:"AIzaSyChSeXTRYpykQkMmcDj041nlq-Nkt03oC4",
- authDomain:"library-management-tool-31dcd.firebaseapp.com",
- projectId:"library-management-tool-31dcd"
-});
-signInAnonymously(getAuth(app));
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+};
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ===== State ===== */
+/* ===== 状態 ===== */
 let books = [];
-const UI = { editingId:null, scanning:false, importing:false };
+let editingId = null;
+let importing = false;
 
-/* ===== Snapshot ===== */
-onSnapshot(query(collection(db,"books"),orderBy("createdAt","desc")),snap=>{
- if(UI.importing) return;
- books = snap.docs.map(d=>({id:d.id,...d.data()}));
- renderBooks();
+/* ===== DOM ===== */
+const list = document.getElementById("list");
+const modal = document.getElementById("modal");
+const search = document.getElementById("search");
+
+const mcNumber = document.getElementById("mcNumber");
+const isbn = document.getElementById("isbn");
+const title = document.getElementById("title");
+const author = document.getElementById("author");
+const coverInput = document.getElementById("coverInput");
+
+/* ===== Firestore ===== */
+onSnapshot(collection(db,"books"), snap=>{
+  if(importing) return;
+  books = snap.docs.map(d=>({id:d.id,...d.data()}));
+  render();
 });
 
-/* ===== Render ===== */
-function renderBooks(){
- const q = searchInput.value;
- grid.innerHTML="";
- books.filter(b=>
-  b.mcNumber?.includes(q)||
-  b.isbn?.includes(q)||
-  b.title?.includes(q)
- ).forEach(b=>{
-  grid.innerHTML+=`
-<div class="bg-white p-3 rounded shadow">
-<div class="h-32 bg-slate-100 flex items-center justify-center mb-2">
-${b.cover?`<img src="${b.cover}" class="h-full object-contain">`:"No Image"}
-</div>
-<p class="font-bold text-sm">${b.title}</p>
-<p class="text-sm">${b.author||""}</p>
-<p class="text-xs">管理番号：${b.mcNumber}</p>
-<div class="flex gap-2 mt-2 text-sm">
-<button onclick="editBook('${b.id}')" class="border flex-1">編集</button>
-<button onclick="removeBook('${b.id}')" class="border flex-1 text-red-500">削除</button>
-</div>
-</div>`;
- });
-}
+/* ===== UI ===== */
+window.openModal = ()=>{
+  modal.classList.remove("hidden");
+};
+window.closeModal = ()=>{
+  modal.classList.add("hidden");
+  editingId = null;
+  form.reset();
+  updateCover("");
+};
 
-/* ===== Modal ===== */
-addBtn.onclick=()=>openModal();
-cancelBtn.onclick=()=>closeModal();
-
-function openModal(){
- modal.classList.replace("hidden","flex");
-}
-function closeModal(){
- modal.classList.replace("flex","hidden");
- stopScanner();
- UI.editingId=null;
- resetForm();
-}
+const render = ()=>{
+  const q = search.value.toLowerCase();
+  list.innerHTML = "";
+  books.filter(b =>
+    b.mcNumber?.includes(q) ||
+    b.isbn?.includes(q) ||
+    b.title?.toLowerCase().includes(q)
+  ).forEach(b=>{
+    list.innerHTML += `
+      <div class="border p-2 rounded flex gap-2 items-center">
+        <img src="${b.cover||''}" class="w-16 h-20 object-contain bg-slate-100">
+        <div class="flex-1">
+          <div class="font-bold">${b.title||""}</div>
+          <div class="text-sm">${b.author||""}</div>
+          <div class="text-xs">管理番号:${b.mcNumber}</div>
+        </div>
+        <button onclick="editBook('${b.id}')">✏️</button>
+        <button onclick="delBook('${b.id}')">🗑</button>
+      </div>`;
+  });
+};
 
 /* ===== CRUD ===== */
-saveBtn.onclick=async()=>{
- if(!/^\d{10}$/.test(mcNumber.value)) return alert("管理番号は10桁");
- if(books.some(b=>b.mcNumber===mcNumber.value&&b.id!==UI.editingId))
-  return alert("管理番号重複");
-
- const data={
-  mcNumber:mcNumber.value,
-  isbn:isbn.value,
-  title:title.value,
-  author:author.value,
-  cover:coverInput.value,
-  updatedAt:new Date()
- };
-
- if(UI.editingId)
-  await updateDoc(doc(db,"books",UI.editingId),data);
- else
-  await addDoc(collection(db,"books"),{...data,createdAt:new Date()});
-
- closeModal();
-};
-
-window.editBook=id=>{
- const b=books.find(x=>x.id===id);
- UI.editingId=id;
- mcNumber.value=b.mcNumber;
- isbn.value=b.isbn;
- title.value=b.title;
- author.value=b.author;
- coverInput.value=b.cover||"";
- updateCover(b.cover||"");
- openModal();
-};
-
-window.removeBook=async id=>{
- if(confirm("削除しますか？"))
-  await deleteDoc(doc(db,"books",id));
-};
-
-/* ===== ISBN ===== */
-isbnBtn.onclick=async()=>{
- const i=isbn.value.replace(/[^0-9]/g,"");
- const r=await fetch(`https://api.openbd.jp/v1/get?isbn=${i}`);
- const d=await r.json();
- if(d[0]){
-  title.value=d[0].summary.title||"";
-  author.value=d[0].summary.author||"";
-  coverInput.value=d[0].summary.cover||"";
-  updateCover(coverInput.value);
- }
-};
-
-/* ===== Cover ===== */
-coverInput.oninput=()=>updateCover(coverInput.value);
-coverFile.onchange=e=>{
- const r=new FileReader();
- r.onload=ev=>{
-  coverInput.value=ev.target.result;
-  updateCover(ev.target.result);
- };
- r.readAsDataURL(e.target.files[0]);
-};
-function updateCover(url){
- coverPreview.innerHTML=url?`<img src="${url}" class="h-full object-contain">`:"No Image";
-}
-
-/* ===== Scanner ===== */
-scanBtn.onclick=()=>{
- if(UI.scanning) return;
- scanner.classList.remove("hidden");
- Quagga.init({
-  inputStream:{
-   type:"LiveStream",
-   target:scanner,
-   constraints:{facingMode:"environment"}
-  },
-  decoder:{readers:["ean_reader"]}
- },err=>{
-  if(err) return alert("カメラ起動失敗");
-  Quagga.start();
-  UI.scanning=true;
- });
- Quagga.onDetected(r=>{
-  const c=r.codeResult.code;
-  if(/^97[89]\d{10}$/.test(c)){
-   isbn.value=c;
-   stopScanner();
-   isbnBtn.onclick();
+window.saveBook = async ()=>{
+  if(!/^\d{10}$/.test(mcNumber.value)){
+    alert("管理番号は10桁数字");
+    return;
   }
- });
+  if(!editingId && books.some(b=>b.mcNumber===mcNumber.value)){
+    alert("管理番号が重複しています");
+    return;
+  }
+
+  const data = {
+    mcNumber: mcNumber.value,
+    isbn: isbn.value,
+    title: title.value,
+    author: author.value,
+    cover: coverInput.value,
+    createdAt: serverTimestamp()
+  };
+
+  if(editingId){
+    await updateDoc(doc(db,"books",editingId),data);
+  }else{
+    await addDoc(collection(db,"books"),data);
+  }
+  closeModal();
 };
-function stopScanner(){
- if(UI.scanning){
-  Quagga.stop();
-  Quagga.offDetected();
- }
- UI.scanning=false;
- scanner.classList.add("hidden");
-}
+
+window.editBook = id=>{
+  const b = books.find(x=>x.id===id);
+  editingId = id;
+  mcNumber.value=b.mcNumber;
+  isbn.value=b.isbn;
+  title.value=b.title;
+  author.value=b.author;
+  coverInput.value=b.cover||"";
+  updateCover(b.cover||"");
+  openModal();
+};
+
+window.delBook = async id=>{
+  if(confirm("削除しますか？")){
+    await deleteDoc(doc(db,"books",id));
+  }
+};
+
+/* ===== ISBN取得 ===== */
+window.getISBN = async ()=>{
+  const i = isbn.value.replace(/\D/g,"");
+  if(!i) return;
+
+  const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${i}`);
+  const d = await r.json();
+  if(d[0]){
+    title.value=d[0].summary.title||"";
+    author.value=d[0].summary.author||"";
+  }
+
+  const gr = await fetch(
+    `https://www.googleapis.com/books/v1/volumes?q=isbn:${i}`
+  );
+  const gd = await gr.json();
+  const img = gd.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
+  if(img){
+    updateCover(img.replace("http://","https://"));
+  }
+};
+
+/* ===== 表紙 ===== */
+window.updateCover = url=>{
+  coverInput.value=url||"";
+  document.getElementById("preview").innerHTML =
+    url?`<img src="${url}" class="h-full object-contain">`:"No Image";
+};
+
+window.uploadCover = input=>{
+  const f=input.files[0];
+  if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>updateCover(e.target.result);
+  r.readAsDataURL(f);
+};
 
 /* ===== CSV ===== */
-csvOut.onclick=()=>{
- let csv="管理番号,ISBN,タイトル,著者,表紙\n";
- books.forEach(b=>csv+=`${b.mcNumber},${b.isbn},${b.title},${b.author},${b.cover||""}\n`);
- const a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([csv]));
- a.download="books.csv";
- a.click();
+window.exportCSV = ()=>{
+  const h=["管理番号","ISBN","タイトル","著者","表紙"];
+  const r=books.map(b=>[b.mcNumber,b.isbn,b.title,b.author,b.cover]);
+  const csv=[h,...r].map(x=>x.map(v=>`"${v||""}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv]));
+  a.download="books.csv";
+  a.click();
 };
-
-csvIn.onchange=async e=>{
- UI.importing=true;
- const text=await e.target.files[0].text();
- for(const l of text.split("\n").slice(1)){
-  if(!l.trim()) continue;
-  const [mc,isbn,title,author,cover]=l.split(",");
-  if(!/^\d{10}$/.test(mc)) continue;
-  if(books.some(b=>b.mcNumber===mc)) continue;
-  await addDoc(collection(db,"books"),{
-   mcNumber:mc,isbn,title,author,cover,createdAt:new Date()
-  });
- }
- UI.importing=false;
- alert("CSV取込完了");
-};
-
-/* ===== Utils ===== */
-function resetForm(){
- mcNumber.value=isbn.value=title.value=author.value=coverInput.value="";
- updateCover("");
-}
-searchInput.oninput=renderBooks;
 </script>
+</head>
 
+<body class="bg-slate-50">
+<header class="p-4 bg-white shadow flex gap-2">
+  <input id="search" oninput="render()" placeholder="検索"
+   class="border p-2 flex-1 rounded">
+  <button onclick="exportCSV()">CSV</button>
+  <button onclick="openModal()">＋登録</button>
+</header>
+
+<main id="list" class="p-4 space-y-2"></main>
+
+<!-- Modal -->
+<div id="modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center">
+<form id="form" class="bg-white p-4 w-80 space-y-2">
+  <input id="mcNumber" placeholder="管理番号10桁" class="border p-2 w-full">
+  <div class="flex gap-1">
+    <input id="isbn" placeholder="ISBN" class="border p-2 flex-1">
+    <button type="button" onclick="getISBN()">取得</button>
+  </div>
+  <input id="title" placeholder="タイトル" class="border p-2 w-full">
+  <input id="author" placeholder="著者" class="border p-2 w-full">
+
+  <div id="preview" class="h-32 bg-slate-100 flex items-center justify-center">No Image</div>
+  <input id="coverInput" class="border p-2 w-full">
+  <input type="file" accept="image/*" onchange="uploadCover(this)">
+
+  <div class="flex gap-2">
+    <button type="button" onclick="saveBook()" class="flex-1 bg-slate-800 text-white">保存</button>
+    <button type="button" onclick="closeModal()" class="flex-1">取消</button>
+  </div>
+</form>
+</div>
 </body>
 </html>
