@@ -21,7 +21,9 @@ body{font-family:'Noto Sans JP',sans-serif}
 
 <header class="bg-white p-4 shadow flex justify-between items-center">
   <h1 class="font-bold text-xl">📚 蔵書管理</h1>
-  <button onclick="openModal()" class="bg-slate-800 text-white px-4 py-2 rounded">＋ 登録</button>
+  <button onclick="openModal()" class="bg-slate-800 text-white px-4 py-2 rounded">
+    ＋ 登録
+  </button>
 </header>
 
 <main class="p-4">
@@ -44,19 +46,31 @@ body{font-family:'Noto Sans JP',sans-serif}
 </div>
 
 <input id="isbn" placeholder="ISBN" class="w-full border p-2 mb-2">
-<button onclick="lookupISBN()" class="w-full bg-slate-200 p-2 rounded mb-2">ISBN情報取得</button>
+<button onclick="lookupISBN()" class="w-full bg-slate-200 p-2 rounded mb-2">
+ISBN情報取得
+</button>
+
+<!-- ★ 管理番号（10桁） -->
+<input id="mcNumber" placeholder="管理番号（数字10桁）"
+  class="w-full border p-2 mb-2"
+  inputmode="numeric" maxlength="10">
 
 <input id="title" placeholder="タイトル" class="w-full border p-2 mb-2">
 <input id="author" placeholder="著者" class="w-full border p-2 mb-2">
 <input type="hidden" id="cover">
 
-<div id="coverPreview" class="h-40 border flex items-center justify-center mb-3 text-slate-400">
+<div id="coverPreview"
+  class="h-40 border flex items-center justify-center mb-3 text-slate-400">
 No Image
 </div>
 
 <div class="flex gap-2">
-  <button onclick="closeModal()" class="flex-1 border p-2 rounded">キャンセル</button>
-  <button onclick="saveBook()" class="flex-1 bg-slate-800 text-white p-2 rounded">保存</button>
+  <button onclick="closeModal()" class="flex-1 border p-2 rounded">
+    キャンセル
+  </button>
+  <button onclick="saveBook()" class="flex-1 bg-slate-800 text-white p-2 rounded">
+    保存
+  </button>
 </div>
 
 </div>
@@ -93,10 +107,15 @@ onSnapshot(
           ${b.cover ? `<img src="${b.cover}" class="h-full object-contain">` : "No Image"}
         </div>
         <p class="font-bold text-sm">${b.title}</p>
-        <p class="text-xs text-slate-400 mb-2">${b.author}</p>
-        <div class="flex gap-2 text-xs">
-          <button onclick="editBook('${b.id}')" class="flex-1 border rounded py-1">編集</button>
-          <button onclick="deleteBook('${b.id}')" class="flex-1 border rounded py-1 text-red-500">削除</button>
+        <p class="text-xs text-slate-400">${b.author}</p>
+        <p class="text-[10px] text-slate-500 mt-1">
+          管理番号：${b.mcNumber || "—"}
+        </p>
+        <div class="flex gap-2 text-xs mt-2">
+          <button onclick="editBook('${b.id}')"
+            class="flex-1 border rounded py-1">編集</button>
+          <button onclick="deleteBook('${b.id}')"
+            class="flex-1 border rounded py-1 text-red-500">削除</button>
         </div>
       </div>`;
     });
@@ -104,8 +123,17 @@ onSnapshot(
 );
 
 window.saveBook = async () => {
+  const mc = mcNumber.value.trim();
+
+  // ★ 10桁チェック
+  if(!/^\d{10}$/.test(mc)){
+    alert("管理番号は数字10桁で入力してください");
+    return;
+  }
+
   const data = {
     isbn:isbn.value,
+    mcNumber:mc,
     title:title.value,
     author:author.value,
     cover:cover.value,
@@ -115,7 +143,10 @@ window.saveBook = async () => {
   if(editingId){
     await updateDoc(doc(db,"books",editingId), data);
   }else{
-    await addDoc(collection(db,"books"),{...data,createdAt:new Date()});
+    await addDoc(collection(db,"books"), {
+      ...data,
+      createdAt:new Date()
+    });
   }
   closeModal();
 };
@@ -124,11 +155,17 @@ window.editBook = id => {
   const b = books.find(x=>x.id===id);
   if(!b) return;
   editingId = id;
+
   isbn.value=b.isbn||"";
+  mcNumber.value=b.mcNumber||"";
   title.value=b.title||"";
   author.value=b.author||"";
   cover.value=b.cover||"";
-  coverPreview.innerHTML=b.cover?`<img src="${b.cover}" class="h-full w-full object-contain">`:"No Image";
+
+  coverPreview.innerHTML=b.cover
+    ? `<img src="${b.cover}" class="h-full w-full object-contain">`
+    : "No Image";
+
   openModal();
 };
 
@@ -141,7 +178,6 @@ window.deleteBook = async id => {
 
 <script>
 let scanning=false;
-const $=id=>document.getElementById(id);
 
 function openModal(){modal.classList.replace("hidden","flex")}
 function closeModal(){
@@ -198,7 +234,9 @@ async function lookupISBN(){
   title.value=t;
   author.value=a;
   cover.value=c;
-  coverPreview.innerHTML=c?`<img src="${c}" class="h-full w-full object-contain">`:"表紙なし";
+  coverPreview.innerHTML=c
+    ? `<img src="${c}" class="h-full w-full object-contain">`
+    : "表紙なし";
 }
 </script>
 
