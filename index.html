@@ -1,210 +1,43 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>蔵書管理（安定版）</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Firebase -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getFirestore, collection, addDoc, deleteDoc, doc,
-  onSnapshot, updateDoc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-/* ===== 状態 ===== */
-let books = [];
-let editingId = null;
-let importing = false;
-
-/* ===== DOM ===== */
-const list = document.getElementById("list");
-const modal = document.getElementById("modal");
-const search = document.getElementById("search");
-
-const mcNumber = document.getElementById("mcNumber");
-const isbn = document.getElementById("isbn");
-const title = document.getElementById("title");
-const author = document.getElementById("author");
-const coverInput = document.getElementById("coverInput");
-
-/* ===== Firestore ===== */
-onSnapshot(collection(db,"books"), snap=>{
-  if(importing) return;
-  books = snap.docs.map(d=>({id:d.id,...d.data()}));
-  render();
-});
-
-/* ===== UI ===== */
-window.openModal = ()=>{
-  modal.classList.remove("hidden");
-};
-window.closeModal = ()=>{
-  modal.classList.add("hidden");
-  editingId = null;
-  form.reset();
-  updateCover("");
-};
-
-const render = ()=>{
-  const q = search.value.toLowerCase();
-  list.innerHTML = "";
-  books.filter(b =>
-    b.mcNumber?.includes(q) ||
-    b.isbn?.includes(q) ||
-    b.title?.toLowerCase().includes(q)
-  ).forEach(b=>{
-    list.innerHTML += `
-      <div class="border p-2 rounded flex gap-2 items-center">
-        <img src="${b.cover||''}" class="w-16 h-20 object-contain bg-slate-100">
-        <div class="flex-1">
-          <div class="font-bold">${b.title||""}</div>
-          <div class="text-sm">${b.author||""}</div>
-          <div class="text-xs">管理番号:${b.mcNumber}</div>
-        </div>
-        <button onclick="editBook('${b.id}')">✏️</button>
-        <button onclick="delBook('${b.id}')">🗑</button>
-      </div>`;
-  });
-};
-
-/* ===== CRUD ===== */
-window.saveBook = async ()=>{
-  if(!/^\d{10}$/.test(mcNumber.value)){
-    alert("管理番号は10桁数字");
-    return;
-  }
-  if(!editingId && books.some(b=>b.mcNumber===mcNumber.value)){
-    alert("管理番号が重複しています");
+<script>
+window.exportCSV = () => {
+  if (!books.length) {
+    alert("エクスポートするデータがありません");
     return;
   }
 
-  const data = {
-    mcNumber: mcNumber.value,
-    isbn: isbn.value,
-    title: title.value,
-    author: author.value,
-    cover: coverInput.value,
-    createdAt: serverTimestamp()
-  };
+  const header = [
+    "管理番号",
+    "ISBN",
+    "タイトル",
+    "著者",
+    "表紙URL",
+    "登録日"
+  ];
 
-  if(editingId){
-    await updateDoc(doc(db,"books",editingId),data);
-  }else{
-    await addDoc(collection(db,"books"),data);
-  }
-  closeModal();
-};
+  const rows = books.map(b => [
+    b.mcNumber || "",
+    b.isbn || "",
+    b.title || "",
+    b.author || "",
+    b.cover || "",
+    b.createdAt?.toDate
+      ? b.createdAt.toDate().toISOString().slice(0,10)
+      : ""
+  ]);
 
-window.editBook = id=>{
-  const b = books.find(x=>x.id===id);
-  editingId = id;
-  mcNumber.value=b.mcNumber;
-  isbn.value=b.isbn;
-  title.value=b.title;
-  author.value=b.author;
-  coverInput.value=b.cover||"";
-  updateCover(b.cover||"");
-  openModal();
-};
+  const csv = [header, ...rows]
+    .map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(","))
+    .join("\n");
 
-window.delBook = async id=>{
-  if(confirm("削除しますか？")){
-    await deleteDoc(doc(db,"books",id));
-  }
-};
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
 
-/* ===== ISBN取得 ===== */
-window.getISBN = async ()=>{
-  const i = isbn.value.replace(/\D/g,"");
-  if(!i) return;
-
-  const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${i}`);
-  const d = await r.json();
-  if(d[0]){
-    title.value=d[0].summary.title||"";
-    author.value=d[0].summary.author||"";
-  }
-
-  const gr = await fetch(
-    `https://www.googleapis.com/books/v1/volumes?q=isbn:${i}`
-  );
-  const gd = await gr.json();
-  const img = gd.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
-  if(img){
-    updateCover(img.replace("http://","https://"));
-  }
-};
-
-/* ===== 表紙 ===== */
-window.updateCover = url=>{
-  coverInput.value=url||"";
-  document.getElementById("preview").innerHTML =
-    url?`<img src="${url}" class="h-full object-contain">`:"No Image";
-};
-
-window.uploadCover = input=>{
-  const f=input.files[0];
-  if(!f) return;
-  const r=new FileReader();
-  r.onload=e=>updateCover(e.target.result);
-  r.readAsDataURL(f);
-};
-
-/* ===== CSV ===== */
-window.exportCSV = ()=>{
-  const h=["管理番号","ISBN","タイトル","著者","表紙"];
-  const r=books.map(b=>[b.mcNumber,b.isbn,b.title,b.author,b.cover]);
-  const csv=[h,...r].map(x=>x.map(v=>`"${v||""}"`).join(",")).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv]));
-  a.download="books.csv";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `books_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 </script>
-</head>
-
-<body class="bg-slate-50">
-<header class="p-4 bg-white shadow flex gap-2">
-  <input id="search" oninput="render()" placeholder="検索"
-   class="border p-2 flex-1 rounded">
-  <button onclick="exportCSV()">CSV</button>
-  <button onclick="openModal()">＋登録</button>
-</header>
-
-<main id="list" class="p-4 space-y-2"></main>
-
-<!-- Modal -->
-<div id="modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center">
-<form id="form" class="bg-white p-4 w-80 space-y-2">
-  <input id="mcNumber" placeholder="管理番号10桁" class="border p-2 w-full">
-  <div class="flex gap-1">
-    <input id="isbn" placeholder="ISBN" class="border p-2 flex-1">
-    <button type="button" onclick="getISBN()">取得</button>
-  </div>
-  <input id="title" placeholder="タイトル" class="border p-2 w-full">
-  <input id="author" placeholder="著者" class="border p-2 w-full">
-
-  <div id="preview" class="h-32 bg-slate-100 flex items-center justify-center">No Image</div>
-  <input id="coverInput" class="border p-2 w-full">
-  <input type="file" accept="image/*" onchange="uploadCover(this)">
-
-  <div class="flex gap-2">
-    <button type="button" onclick="saveBook()" class="flex-1 bg-slate-800 text-white">保存</button>
-    <button type="button" onclick="closeModal()" class="flex-1">取消</button>
-  </div>
-</form>
-</div>
-</body>
-</html>
