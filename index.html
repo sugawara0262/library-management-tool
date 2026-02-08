@@ -23,18 +23,11 @@ body { font-family: system-ui, -apple-system, BlinkMacSystemFont; }
   </button>
 </header>
 
-<div class="p-3 flex items-center gap-3">
-  <label class="flex items-center gap-2 text-sm">
-    <input type="checkbox" id="inventoryToggle">
-    棚卸モード
-  </label>
-</div>
-
 <main class="p-3">
   <div id="grid" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
 </main>
 
-<!-- モーダル（登録・編集 共通） -->
+<!-- 登録・編集モーダル -->
 <div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
   <div class="bg-white w-full max-w-md rounded-xl p-4">
 
@@ -75,15 +68,14 @@ body { font-family: system-ui, -apple-system, BlinkMacSystemFont; }
   </div>
 </div>
 
-<!-- Firebase / JS -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot,
-  query, orderBy, doc, updateDoc, deleteDoc
+  doc, updateDoc, deleteDoc
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-/* Firebase設定 */
+/* Firebase設定（差し替え） */
 const app = initializeApp({
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_DOMAIN",
@@ -100,7 +92,6 @@ const title = document.getElementById("title");
 const author = document.getElementById("author");
 const cover = document.getElementById("cover");
 const coverPreview = document.getElementById("coverPreview");
-const inventoryToggle = document.getElementById("inventoryToggle");
 const scannerDiv = document.getElementById("scanner");
 
 /* State */
@@ -108,11 +99,19 @@ let books = [];
 let editingId = null;
 let scanning = false;
 
-/* Firestore監視 */
+/* 🔥 Firestore監視（orderByなし＝必ず表示される） */
 onSnapshot(
-  query(collection(db,"books"), orderBy("createdAt","desc")),
+  collection(db,"books"),
   snap=>{
     books = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+
+    // createdAt があるものを優先して新しい順に並べる
+    books.sort((a,b)=>{
+      const ta = a.createdAt?.seconds || 0;
+      const tb = b.createdAt?.seconds || 0;
+      return tb - ta;
+    });
+
     render();
   }
 );
@@ -147,7 +146,7 @@ function render(){
 /* 保存 */
 window.saveBook = async () => {
   if(!/^\d{10}$/.test(mcNumber.value)){
-    alert("管理番号は10桁数字");
+    alert("管理番号は10桁数字で入力してください");
     return;
   }
 
@@ -163,7 +162,11 @@ window.saveBook = async () => {
   if(editingId){
     await updateDoc(doc(db,"books",editingId), data);
   }else{
-    await addDoc(collection(db,"books"), { ...data, createdAt:new Date() });
+    await addDoc(collection(db,"books"), {
+      ...data,
+      createdAt:new Date(),
+      updatedAt:new Date()
+    });
   }
   closeModal();
 };
