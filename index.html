@@ -1,713 +1,240 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>蔵書管理システム</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>蔵書管理システム</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet">
 
-    <style>
-        body { font-family: 'Noto Sans JP', sans-serif; }
-        #interactive { 
-            height: 240px; 
-            background: #000; 
-            border-radius: 12px; 
-            overflow: hidden; 
-            position: relative; 
-            width: 100%;
-        }
-        #interactive video, #interactive canvas { 
-            width: 100% !important; 
-            height: 100% !important; 
-            object-fit: cover; 
-        }
-        .scan-overlay { position: absolute; inset: 0; pointer-events: none; background: rgba(0,0,0,0.2); z-index: 10; }
-        .scan-box { position: absolute; inset: 20% 10%; border: 2px solid rgba(255,0,0,0.6); box-shadow: 0 0 0 2000px rgba(0,0,0,0.4); z-index: 11; }
-        .scan-line { position: absolute; left: 10%; right: 10%; top: 50%; height: 2px; background: red; box-shadow: 0 0 8px red; animation: scanAnim 2s infinite; z-index: 12; }
-        @keyframes scanAnim { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-        .loader { border: 2px solid #f3f3f3; border-top: 2px solid #1e293b; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    </style>
+<style>
+body{font-family:'Noto Sans JP',sans-serif}
+#interactive{height:260px;background:#000;border-radius:12px;overflow:hidden}
+#interactive video{width:100%;height:100%;object-fit:cover}
+.scan-box{position:absolute;inset:20% 10%;border:2px solid red}
+</style>
 </head>
 
-<body class="bg-slate-100 min-h-screen text-slate-800">
+<body class="bg-slate-100 min-h-screen">
 
-<header class="bg-white shadow sticky top-0 z-20">
-    <div class="px-4 py-3 flex justify-between items-center border-b border-slate-100">
-        <h1 class="font-bold text-xl flex items-center gap-2 text-slate-800">
-            <span class="material-icons-round text-slate-700">library_books</span>
-            <span class="hidden xs:inline">蔵書管理</span>
-            <span class="inline xs:hidden">蔵書</span>
-        </h1>
-        <div class="flex gap-2">
-            <button id="toggleShelfBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200">
-                <span class="material-icons-round text-sm">fact_check</span>
-                <span class="hidden sm:inline">棚卸モード</span>
-                <span class="inline sm:hidden">棚卸</span>
-            </button>
-            <button id="btnOpenModal" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 shadow-md hover:shadow-lg transition transform active:scale-95">
-                <span class="material-icons-round text-sm">add</span> 登録
-            </button>
-        </div>
-    </div>
-    
-    <div class="px-4 py-3 bg-slate-50 flex gap-2 overflow-x-auto border-b border-slate-200">
-        <div class="flex-1 relative min-w-[160px]">
-            <span class="material-icons-round absolute left-2 top-2.5 text-slate-400 text-sm">search</span>
-            <input id="searchTitle" placeholder="タイトル・著者名で検索" class="w-full pl-8 pr-2 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white transition-shadow">
-        </div>
-        <div class="w-1/3 min-w-[120px] max-w-[200px] relative">
-            <span class="material-icons-round absolute left-2 top-2.5 text-slate-400 text-sm">tag</span>
-            <input id="searchMc" placeholder="管理番号" class="w-full pl-8 pr-2 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white transition-shadow" inputmode="numeric">
-        </div>
-    </div>
+<header class="bg-white p-4 shadow flex justify-between items-center">
+  <h1 class="font-bold text-xl">📚 蔵書管理</h1>
+  <button onclick="openModal()" class="bg-slate-800 text-white px-4 py-2 rounded">＋ 登録</button>
 </header>
 
-<main class="p-4 max-w-7xl mx-auto pb-20">
-    <div id="loadingMsg" class="text-center text-slate-400 mt-20">
-        <div class="inline-block w-8 h-8 border-4 border-slate-200 border-t-slate-500 rounded-full animate-spin mb-4"></div>
-        <p class="text-sm font-medium">データを読み込んでいます...</p>
-    </div>
-
-    <div id="emptyState" class="hidden flex flex-col items-center justify-center mt-20 text-slate-400">
-        <span class="material-icons-round text-6xl mb-2 text-slate-300">menu_book</span>
-        <p>書籍が登録されていません</p>
-        <button id="btnEmptyAdd" class="mt-4 text-slate-600 hover:text-slate-800 underline text-sm">最初の1冊を登録する</button>
-    </div>
-
-    <div id="bookGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
-
-    <div id="noResultMsg" class="hidden text-center text-slate-400 mt-20">
-        <span class="material-icons-round text-4xl mb-2 text-slate-300">search_off</span>
-        <p>条件に一致する書籍が見つかりませんでした</p>
-    </div>
+<main class="p-4">
+  <div id="bookGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
 </main>
 
-<div id="modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center p-4 z-50 backdrop-blur-sm transition-opacity opacity-0" style="transition: opacity 0.2s ease-in-out;">
-    <div class="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col">
-        <div class="flex justify-between items-center mb-4 shrink-0">
-            <h2 id="modalTitle" class="font-bold text-lg text-slate-700 flex items-center gap-2">
-                <span class="material-icons-round text-slate-500">edit_note</span>
-                <span>書籍登録 / 編集</span>
-            </h2>
-            <button id="btnCloseModal" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition">
-                <span class="material-icons-round">close</span>
-            </button>
-        </div>
+<!-- Modal -->
+<div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+<div class="bg-white w-full max-w-md rounded-xl p-4">
 
-        <div id="scannerSection" class="hidden mb-4 relative shrink-0">
-            <div class="bg-black rounded-xl overflow-hidden relative shadow-inner">
-                <div id="interactive"></div>
-                <div class="scan-overlay"></div>
-                <div class="scan-box"></div>
-                <div class="scan-line"></div>
-                <div class="absolute bottom-2 right-2 text-white text-[10px] bg-black/50 px-2 py-1 rounded">EAN/ISBN対応</div>
-            </div>
-            <button id="btnStopScan" class="w-full mt-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg py-2 text-sm font-bold border border-red-200 transition">
-                スキャンを中止
-            </button>
-        </div>
+<h2 class="font-bold mb-3">書籍登録 / 編集</h2>
 
-        <div id="formFields" class="flex-1 overflow-y-auto pr-1">
-            <button id="btnScan" class="w-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl p-4 mb-6 flex flex-col justify-center items-center gap-1 transition group">
-                <span class="material-icons-round text-2xl group-hover:scale-110 transition-transform text-slate-500">qr_code_scanner</span>
-                <span class="text-sm font-bold">バーコードで読み取る</span>
-            </button>
+<button onclick="startScanner()" class="w-full border rounded p-3 mb-3">
+📷 バーコードスキャン
+</button>
 
-            <div class="space-y-4">
-                <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">ISBNコード</label>
-                    <div class="flex gap-2">
-                        <input id="inpIsbn" placeholder="例: 9784..." class="flex-1 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-slate-500 outline-none text-sm font-mono" inputmode="numeric">
-                        <button id="btnLookup" class="bg-slate-800 hover:bg-slate-700 text-white disabled:bg-slate-300 px-4 rounded-lg text-sm font-bold transition flex items-center justify-center min-w-[70px]">
-                            <span id="lookupText">検索</span>
-                            <div id="lookupLoader" class="loader hidden border-slate-400 border-t-white"></div>
-                        </button>
-                    </div>
-                </div>
+<div id="scanner" class="hidden relative mb-3">
+  <div id="interactive"><div class="scan-box"></div></div>
+  <button onclick="stopScanner()" class="w-full text-red-500 mt-2">キャンセル</button>
+</div>
 
-                <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">管理番号 <span class="text-red-400">*</span></label>
-                    <input id="inpMcNumber" placeholder="例: 0000000001" class="w-full border border-slate-300 rounded-lg p-2.5 outline-none text-sm font-mono" inputmode="numeric" maxlength="10">
-                </div>
+<input id="isbn" placeholder="ISBN" class="w-full border p-2 mb-2">
+<button onclick="lookupISBN()" class="w-full bg-slate-200 p-2 rounded mb-2">ISBN情報取得</button>
 
-                <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">タイトル <span class="text-red-400">*</span></label>
-                    <input id="inpTitle" placeholder="書籍のタイトル" class="w-full border border-slate-300 rounded-lg p-2.5 outline-none text-sm font-bold">
-                </div>
+<input id="mcNumber" placeholder="管理番号（数字10桁）"
+  class="w-full border p-2 mb-2" inputmode="numeric" maxlength="10">
 
-                <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">著者名</label>
-                    <input id="inpAuthor" placeholder="著者名" class="w-full border border-slate-300 rounded-lg p-2.5 outline-none text-sm">
-                </div>
+<input id="title" placeholder="タイトル" class="w-full border p-2 mb-2">
+<input id="author" placeholder="著者" class="w-full border p-2 mb-2">
 
-                <div>
-                    <label class="text-xs font-bold text-slate-500 ml-1 mb-1 block">表紙画像</label>
-                    <input type="hidden" id="inpCover">
-                    <div id="coverPreview" class="h-40 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 overflow-hidden relative shadow-sm">
-                        <!-- JS Controlled -->
-                        <span class="text-sm flex flex-col items-center gap-1">
-                            <span class="material-icons-round text-slate-300">image</span>
-                            No Image
-                        </span>
-                    </div>
-                </div>
-            </div>
+<input type="hidden" id="cover">
 
-            <div class="flex gap-3 mt-8 pb-1">
-                <button id="btnCancel" class="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-600 p-3 rounded-lg font-bold text-sm transition">キャンセル</button>
-                <button id="btnSave" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-lg font-bold text-sm shadow-lg shadow-slate-200 transition">保存する</button>
-            </div>
-        </div>
-    </div>
+<div id="coverPreview"
+  class="h-40 border flex items-center justify-center mb-3 text-slate-400">
+No Image
+</div>
+
+<div class="flex gap-2">
+  <button onclick="closeModal()" class="flex-1 border p-2 rounded">キャンセル</button>
+  <button onclick="saveBook()" class="flex-1 bg-slate-800 text-white p-2 rounded">保存</button>
+</div>
+
+</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import {
+  getFirestore, collection, addDoc, onSnapshot,
+  query, orderBy, doc, updateDoc, deleteDoc,
+  where, getDocs
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyChSeXTRYpykQkMmcDj041nlq-Nkt03oC4",
-    authDomain: "library-management-tool-31dcd.firebaseapp.com",
-    projectId: "library-management-tool-31dcd"
-};
-const app = initializeApp(firebaseConfig);
+/* Firebase */
+const app = initializeApp({
+  apiKey: "AIzaSyChSeXTRYpykQkMmcDj041nlq-Nkt03oC4",
+  authDomain: "library-management-tool-31dcd.firebaseapp.com",
+  projectId: "library-management-tool-31dcd"
+});
 const db = getFirestore(app);
 
-const COLLECTION_NAME = "books";
-
-let allBooks = [];
+/* State */
+let books = [];
 let editingId = null;
-let isScanning = false;
-let shelfMode = false;
-let lastCode = "";
-let lastTime = 0;
+let scanning = false;
 
-const el = {
-    grid: document.getElementById("bookGrid"),
-    modal: document.getElementById("modal"),
-    loadingMsg: document.getElementById("loadingMsg"),
-    emptyState: document.getElementById("emptyState"),
-    noResultMsg: document.getElementById("noResultMsg"),
-    searchTitle: document.getElementById("searchTitle"),
-    searchMc: document.getElementById("searchMc"),
-    isbn: document.getElementById("inpIsbn"),
-    mc: document.getElementById("inpMcNumber"),
-    title: document.getElementById("inpTitle"),
-    author: document.getElementById("inpAuthor"),
-    cover: document.getElementById("inpCover"),
-    preview: document.getElementById("coverPreview"),
-    modalTitle: document.getElementById("modalTitle"),
-    formFields: document.getElementById("formFields"),
-    scannerSection: document.getElementById("scannerSection"),
-    btnSave: document.getElementById("btnSave"),
-    btnLookup: document.getElementById("btnLookup"),
-    lookupText: document.getElementById("lookupText"),
-    lookupLoader: document.getElementById("lookupLoader"),
-    toggleShelfBtn: document.getElementById("toggleShelfBtn"),
-    btnOpenModal: document.getElementById("btnOpenModal"),
-    btnEmptyAdd: document.getElementById("btnEmptyAdd"),
-    btnCloseModal: document.getElementById("btnCloseModal"),
-    btnCancel: document.getElementById("btnCancel"),
-    btnScan: document.getElementById("btnScan"),
-    btnStopScan: document.getElementById("btnStopScan")
+/* DOM */
+const grid = document.getElementById("bookGrid");
+
+/* List */
+onSnapshot(
+  query(collection(db,"books"), orderBy("createdAt","desc")),
+  snap=>{
+    books = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    grid.innerHTML="";
+    books.forEach(b=>{
+      grid.innerHTML += `
+      <div class="bg-white p-2 rounded shadow">
+        <div class="h-32 bg-slate-100 mb-2 flex items-center justify-center">
+          ${b.cover ? `<img src="${b.cover}" class="h-full object-contain">` : "No Image"}
+        </div>
+        <p class="font-bold text-sm">${b.title||""}</p>
+        <p class="text-xs text-slate-400">${b.author||""}</p>
+        <p class="text-[10px] text-slate-500 mt-1">
+          管理番号：${b.mcNumber||"—"}
+        </p>
+        <div class="flex gap-2 text-xs mt-2">
+          <button onclick="editBook('${b.id}')" class="flex-1 border rounded py-1">編集</button>
+          <button onclick="deleteBook('${b.id}')" class="flex-1 border rounded py-1 text-red-500">削除</button>
+        </div>
+      </div>`;
+    });
+  }
+);
+
+/* 管理番号重複チェック */
+async function isDuplicateMcNumber(mc, selfId=null){
+  const q = query(collection(db,"books"), where("mcNumber","==",mc));
+  const snap = await getDocs(q);
+
+  if(!selfId){
+    return !snap.empty;
+  }
+  return snap.docs.some(d=>d.id !== selfId);
+}
+
+/* Actions */
+window.saveBook = async ()=>{
+  const mc = mcNumber.value.trim();
+
+  if(!/^\d{10}$/.test(mc)){
+    alert("管理番号は数字10桁で入力してください");
+    return;
+  }
+
+  if(await isDuplicateMcNumber(mc, editingId)){
+    alert("この管理番号はすでに登録されています");
+    return;
+  }
+
+  const data = {
+    isbn:isbn.value,
+    mcNumber:mc,
+    title:title.value,
+    author:author.value,
+    cover:cover.value,
+    updatedAt:new Date()
+  };
+
+  editingId
+    ? await updateDoc(doc(db,"books",editingId), data)
+    : await addDoc(collection(db,"books"), {...data, createdAt:new Date()});
+
+  closeModal();
 };
 
-// Event Listeners
-el.toggleShelfBtn.onclick = toggleShelfMode;
-el.btnOpenModal.onclick = openModal;
-el.btnEmptyAdd.onclick = openModal;
-el.btnCloseModal.onclick = closeModal;
-el.btnCancel.onclick = closeModal;
-el.btnSave.onclick = saveBook;
-el.btnLookup.onclick = lookupISBN;
-el.btnScan.onclick = startScanner;
-el.btnStopScan.onclick = stopScanner;
-el.searchTitle.oninput = applySearch;
-el.searchMc.oninput = applySearch;
+window.editBook = id=>{
+  const b = books.find(x=>x.id===id);
+  if(!b) return;
+  editingId = id;
+  isbn.value=b.isbn||"";
+  mcNumber.value=b.mcNumber||"";
+  title.value=b.title||"";
+  author.value=b.author||"";
+  cover.value=b.cover||"";
+  coverPreview.innerHTML=b.cover
+    ? `<img src="${b.cover}" class="h-full w-full object-contain">`
+    : "No Image";
+  openModal();
+};
 
-function init() {
-    const q = query(collection(db, COLLECTION_NAME), orderBy("updatedAt", "desc"));
-    onSnapshot(q, (snap) => {
-        allBooks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        el.loadingMsg.classList.add("hidden");
-        applySearch();
-    }, (err) => {
-        console.error("Firestore Error:", err);
-        el.loadingMsg.innerHTML = "";
-        el.loadingMsg.textContent = "データ読み込みエラー: " + err.message;
-        el.loadingMsg.classList.add("text-red-500");
-    });
-}
-init();
+window.deleteBook = async id=>{
+  if(confirm("削除しますか？")){
+    await deleteDoc(doc(db,"books",id));
+  }
+};
 
-function applySearch() {
-    const termT = el.searchTitle.value.toLowerCase();
-    const termM = el.searchMc.value;
-    
-    const filtered = allBooks.filter(b => {
-        const titleStr = (b.title || "").toLowerCase();
-        const authorStr = (b.author || "").toLowerCase();
-        const mcStr = (b.mcNumber || "");
-        
-        const matchT = !termT || titleStr.includes(termT) || authorStr.includes(termT);
-        const matchM = !termM || mcStr.includes(termM);
-        return matchT && matchM;
-    });
-    
-    render(filtered);
-}
+/* Modal */
+window.openModal = ()=> modal.classList.replace("hidden","flex");
+window.closeModal = ()=>{
+  stopScanner();
+  editingId=null;
+  modal.classList.replace("flex","hidden");
+};
 
-function render(list) {
-    el.grid.innerHTML = "";
-    
-    const hasData = allBooks.length > 0;
-    const hasResults = list.length > 0;
+/* Scanner */
+window.startScanner = ()=>{
+  scanner.classList.remove("hidden");
+  Quagga.init({
+    inputStream:{type:"LiveStream",target:"#interactive",constraints:{facingMode:"environment"}},
+    decoder:{readers:["ean_reader"]}
+  },err=>{
+    if(err){alert("カメラ起動失敗");return;}
+    Quagga.start(); scanning=true;
+  });
+  Quagga.onDetected(r=>{
+    const c=r.codeResult.code;
+    if(/^97[89]\d{10}$/.test(c)){
+      isbn.value=c;
+      stopScanner();
+      lookupISBN();
+    }
+  });
+};
 
-    el.emptyState.classList.toggle("hidden", hasData);
-    el.noResultMsg.classList.toggle("hidden", !hasData || hasResults);
-    
-    if (!hasResults) return;
+window.stopScanner = ()=>{
+  if(scanning){Quagga.stop();Quagga.offDetected();}
+  scanning=false;
+  scanner.classList.add("hidden");
+};
 
-    list.forEach(b => {
-        const card = document.createElement("div");
-        card.className = "bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col hover:shadow-md transition group h-full relative";
-        
-        // Delete Button
-        const delBtn = document.createElement("button");
-        delBtn.className = "absolute top-2 right-2 bg-white/90 text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full shadow-sm border border-slate-100 transition z-20";
-        delBtn.title = "削除";
-        delBtn.innerHTML = '<span class="material-icons-round text-lg block">delete</span>';
-        delBtn.onclick = (e) => {
-            e.stopPropagation();
-            deleteBook(b.id);
-        };
-        card.appendChild(delBtn);
-
-        // Image Section
-        const imgDiv = document.createElement("div");
-        imgDiv.className = "aspect-[2/3] w-full bg-slate-50 flex items-center justify-center relative overflow-hidden border-b border-slate-50 cursor-pointer";
-        imgDiv.onclick = () => editBook(b.id);
-
-        if (b.cover) {
-            const img = document.createElement("img");
-            img.src = b.cover;
-            img.className = "h-full w-full object-cover transition-transform duration-500 group-hover:scale-105";
-            img.loading = "lazy";
-            img.referrerPolicy = "no-referrer";
-            img.onerror = function() { 
-                // グリッド表示でのエラー時は、控えめなアイコンを表示
-                if(this.parentElement) {
-                    this.parentElement.innerHTML = '<span class="material-icons-round text-4xl text-slate-200">broken_image</span>';
-                }
-            };
-            imgDiv.appendChild(img);
-        } else {
-            const icon = document.createElement("span");
-            icon.className = "material-icons-round text-4xl text-slate-200";
-            icon.textContent = "auto_stories";
-            imgDiv.appendChild(icon);
-        }
-
-        if (b.mcNumber) {
-            const mcBadge = document.createElement("div");
-            mcBadge.className = "absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6";
-            
-            const badgeText = document.createElement("div");
-            badgeText.className = "text-[10px] text-white font-mono font-bold";
-            badgeText.textContent = "No." + b.mcNumber;
-            
-            mcBadge.appendChild(badgeText);
-            imgDiv.appendChild(mcBadge);
-        }
-        card.appendChild(imgDiv);
-
-        // Info Section
-        const infoDiv = document.createElement("div");
-        infoDiv.className = "p-3 flex-1 flex flex-col cursor-pointer";
-        infoDiv.onclick = () => editBook(b.id);
-
-        const title = document.createElement("h3");
-        title.className = "font-bold text-sm line-clamp-2 leading-tight mb-1 text-slate-700 group-hover:text-slate-900 transition";
-        title.textContent = b.title || "無題";
-        infoDiv.appendChild(title);
-
-        const author = document.createElement("p");
-        author.className = "text-xs text-slate-400 truncate mb-1";
-        author.textContent = b.author || "著者不明";
-        infoDiv.appendChild(author);
-
-        if (b.lastChecked) {
-            const checkedDate = b.lastChecked.toDate ? b.lastChecked.toDate() : new Date(b.lastChecked.seconds * 1000);
-            const now = new Date();
-            const isToday = checkedDate.toDateString() === now.toDateString();
-            const dateStr = isToday ? ("今日 " + checkedDate.getHours() + ":" + String(checkedDate.getMinutes()).padStart(2, '0')) : checkedDate.toLocaleDateString();
-            
-            const checkTag = document.createElement("div");
-            checkTag.className = "mt-2 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] px-2 py-1 rounded-md inline-flex items-center gap-1 font-bold w-full";
-            checkTag.innerHTML = '<span class="material-icons-round text-[12px]">check_circle</span><span>棚卸済: ' + dateStr + '</span>';
-            infoDiv.appendChild(checkTag);
-        }
-
-        card.appendChild(infoDiv);
-        el.grid.appendChild(card);
-    });
-}
-
-// シンプルなURL整形（パラメータ削除などは行わない）
-function toHttps(url) {
-    if (!url) return "";
-    return url.replace(/^http:\/\//i, 'https://');
-}
-
-async function lookupISBN() {
-    const code = el.isbn.value.replace(/\D/g, "");
-    if (code.length !== 13 && code.length !== 10) return showToast("ISBNは10桁または13桁で入力してください", true);
-    
-    el.btnLookup.disabled = true;
-    el.lookupText.classList.add("hidden");
-    el.lookupLoader.classList.remove("hidden");
-    el.preview.innerHTML = '<div class="loader border-slate-300 border-t-slate-500"></div>';
-
-    try {
-        let title = "", author = "", cover = "";
-        
-        // ------------------------------------------------
-        // 1. OpenBD (国内書籍優先)
-        // ------------------------------------------------
-        try {
-            const openbdRes = await fetch("https://api.openbd.jp/v1/get?isbn=" + code).then(r => r.json());
-            console.log("OpenBD Result:", openbdRes); // Debug
-            if (openbdRes && openbdRes[0] && openbdRes[0].summary) {
-                const s = openbdRes[0].summary;
-                title = s.title;
-                author = s.author;
-                if (s.cover) {
-                     cover = toHttps(s.cover);
-                }
-            }
-        } catch(e) { console.warn("OpenBD fail", e); }
-
-        // ------------------------------------------------
-        // 2. Google Books (カバー画像がない場合のみ取得)
-        // ------------------------------------------------
-        if (!cover) {
-            try {
-                const googleRes = await fetch("https://www.googleapis.com/books/v1/volumes?q=isbn:" + code).then(r => r.json());
-                console.log("Google Books Result:", googleRes); // Debug
-                
-                if (googleRes.items && googleRes.items[0]) {
-                    const info = googleRes.items[0].volumeInfo;
-                    if (!title) {
-                        title = info.title || "";
-                        author = info.authors?.join(", ") || "";
-                    }
-                    
-                    if (info.imageLinks) {
-                        cover = toHttps(info.imageLinks.thumbnail || info.imageLinks.smallThumbnail);
-                    }
-                }
-            } catch(e) { console.warn("Google Books fail", e); }
-        }
-
-        // ------------------------------------------------
-        // 3. Open Library (最後の手段)
-        // ------------------------------------------------
-        if (!cover) {
-            // Mサイズを指定 (S, M, L available)
-            cover = "https://covers.openlibrary.org/b/isbn/" + code + "-M.jpg?default=false";
-        }
-
-        console.log("Selected Cover URL:", cover);
-
-        if (title) {
-            el.title.value = title;
-            el.author.value = author;
-            el.cover.value = cover;
-            updateCoverPreview(cover);
-            showToast("書籍情報が見つかりました");
-        } else {
-            throw new Error("NOT_FOUND");
-        }
-    } catch (e) {
-        el.preview.innerHTML = '<span class="text-xs text-slate-400">見つかりませんでした</span>';
-        showToast("書籍情報が見つかりませんでした", true);
-    } finally {
-        el.btnLookup.disabled = false;
-        el.lookupText.classList.remove("hidden");
-        el.lookupLoader.classList.add("hidden");
-    }
-}
-
-function updateCoverPreview(url) {
-    el.preview.innerHTML = "";
-    if (url) {
-        const img = document.createElement("img");
-        img.src = url;
-        img.className = "h-full w-full object-contain";
-        // リファラを送信しないことで、一部サイトの画像表示制限を回避
-        img.referrerPolicy = "no-referrer";
-        
-        img.onerror = function() { 
-            // 読み込めなかったらNo Imageアイコンを表示
-            if(this.parentElement) {
-                this.parentElement.innerHTML = '<span class="text-sm flex flex-col items-center gap-1"><span class="material-icons-round text-slate-300">image</span>No Image</span>';
-            }
-        };
-        el.preview.appendChild(img);
-    } else {
-        el.preview.innerHTML = '<span class="text-sm flex flex-col items-center gap-1"><span class="material-icons-round text-slate-300">image</span>No Image</span>';
-    }
-}
-
-function openModal() {
-    editingId = null;
-    shelfMode = false;
-    el.modalTitle.innerHTML = '<span class="material-icons-round text-slate-500 mr-2">add_circle</span>書籍登録';
-    el.isbn.value = ""; el.mc.value = ""; el.title.value = ""; el.author.value = ""; el.cover.value = "";
-    updateCoverPreview("");
-    
-    el.formFields.classList.remove("hidden");
-    el.scannerSection.classList.add("hidden");
-    
-    el.modal.classList.remove("hidden");
-    requestAnimationFrame(() => {
-        el.modal.classList.remove("opacity-0");
-        el.modal.classList.add("flex");
-    });
-}
-
-function closeModal() {
-    stopScanner();
-    el.modal.classList.add("opacity-0");
-    setTimeout(() => {
-        el.modal.classList.remove("flex");
-        el.modal.classList.add("hidden");
-    }, 200);
-}
-
-function editBook(id) {
-    const b = allBooks.find(x => x.id === id);
-    if (!b) return;
-    editingId = id;
-    shelfMode = false;
-    el.modalTitle.innerHTML = '<span class="material-icons-round text-slate-500 mr-2">edit</span>書籍編集';
-    el.isbn.value = b.isbn || "";
-    el.mc.value = b.mcNumber || "";
-    el.title.value = b.title || "";
-    el.author.value = b.author || "";
-    el.cover.value = b.cover || "";
-    updateCoverPreview(b.cover);
-    
-    el.formFields.classList.remove("hidden");
-    el.scannerSection.classList.add("hidden");
-    
-    el.modal.classList.remove("hidden");
-    requestAnimationFrame(() => {
-        el.modal.classList.remove("opacity-0");
-        el.modal.classList.add("flex");
-    });
-}
-
-async function saveBook() {
-    const mcValue = el.mc.value.trim();
-    const titleValue = el.title.value.trim();
-    
-    if (!mcValue) return showToast("管理番号は必須です", true);
-    if (!/^\d+$/.test(mcValue)) return showToast("管理番号は数字で入力してください", true);
-    if (!titleValue) return showToast("タイトルは必須です", true);
-
-    const isDuplicate = allBooks.some(b => b.mcNumber === mcValue && b.id !== editingId);
-    if (isDuplicate) {
-        return showToast("管理番号「" + mcValue + "」は既に使用されています", true);
-    }
-
-    el.btnSave.disabled = true;
-    el.btnSave.textContent = "保存中...";
-
-    const data = {
-        isbn: el.isbn.value.trim(),
-        mcNumber: mcValue,
-        title: titleValue,
-        author: el.author.value.trim(),
-        cover: el.cover.value,
-        updatedAt: new Date()
-    };
-
-    try {
-        if (editingId) {
-            await updateDoc(doc(db, COLLECTION_NAME, editingId), data);
-            showToast("更新しました");
-        } else {
-            data.createdAt = new Date();
-            await addDoc(collection(db, COLLECTION_NAME), data);
-            showToast("登録しました");
-        }
-        closeModal();
-    } catch(e) {
-        console.error(e);
-        showToast("保存に失敗しました: " + e.message, true);
-    } finally {
-        el.btnSave.disabled = false;
-        el.btnSave.textContent = "保存する";
-    }
-}
-
-async function deleteBook(id) {
-    if (confirm("本当にこの書籍を削除しますか？")) {
-        try {
-            await deleteDoc(doc(db, COLLECTION_NAME, id));
-            showToast("削除しました");
-        } catch (e) {
-            console.error(e);
-            showToast("削除失敗: " + e.message, true);
-        }
-    }
-}
-
-function toggleShelfMode() {
-    shelfMode = !shelfMode;
-    
-    if (shelfMode) {
-        el.toggleShelfBtn.className = "bg-green-100 text-green-700 border-green-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border";
-        el.modalTitle.innerHTML = '<span class="material-icons-round text-green-500 mr-2">fact_check</span>棚卸スキャン中';
-        el.formFields.classList.add("hidden");
-        
-        el.modal.classList.remove("hidden");
-        requestAnimationFrame(() => {
-            el.modal.classList.remove("opacity-0");
-            el.modal.classList.add("flex");
-        });
-        startScanner();
-    } else {
-        el.toggleShelfBtn.className = "bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200";
-        closeModal();
-    }
-}
-
-function startScanner() {
-    el.scannerSection.classList.remove("hidden");
-    if (!shelfMode) el.formFields.classList.add("hidden");
-
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: document.querySelector("#interactive"),
-                constraints: {
-                    facingMode: "environment",
-                    width: 640,
-                    height: 480
-                },
-            },
-            decoder: {
-                readers: ["ean_reader"]
-            },
-            locate: true,
-            locator: {
-                patchSize: "medium",
-                halfSample: true
-            }
-        }, (err) => {
-            if (err) {
-                console.error(err);
-                el.scannerSection.innerHTML = '<div class="p-4 text-center text-red-500 bg-red-50 rounded-lg"><p class="font-bold">カメラを起動できませんでした</p><p class="text-xs mt-1">カメラの許可を確認してください。またはHTTPS接続が必要です。</p></div>';
-                return;
-            }
-            Quagga.start();
-            isScanning = true;
-        });
-
-        Quagga.onDetected(async (res) => {
-            const code = res.codeResult.code;
-            const now = Date.now();
-            
-            if (!/^97[89]\d{10}$/.test(code)) return;
-            if (code === lastCode && now - lastTime < 2500) return;
-            
-            lastCode = code;
-            lastTime = now;
-
-            const box = document.querySelector(".scan-box");
-            if(box) {
-                box.style.borderColor = "#4ade80"; 
-                box.style.boxShadow = "0 0 0 2000px rgba(0,0,0,0.7)";
-                setTimeout(() => {
-                    box.style.borderColor = "rgba(255,0,0,0.6)";
-                    box.style.boxShadow = "0 0 0 2000px rgba(0,0,0,0.4)";
-                }, 500);
-            }
-
-            if (shelfMode) {
-                const book = allBooks.find(b => b.isbn === code);
-                if (book) {
-                    await updateDoc(doc(db, COLLECTION_NAME, book.id), {
-                        lastChecked: new Date(),
-                        updatedAt: new Date()
-                    });
-                    showToast("棚卸確認: " + (book.title || 'タイトルなし'));
-                } else {
-                    showToast("未登録: " + code, true);
-                }
-            } else {
-                el.isbn.value = code;
-                stopScanner();
-                showToast("読み取り成功");
-                lookupISBN();
-            }
-        });
-    } else {
-        alert("このデバイスではカメラがサポートされていません");
-        stopScanner();
-    }
-}
-
-function stopScanner() {
-    if (isScanning) { 
-        Quagga.stop(); 
-        Quagga.offDetected(); 
-        isScanning = false; 
-    }
-    el.scannerSection.classList.add("hidden");
-    el.formFields.classList.remove("hidden");
-    
-    if (shelfMode) {
-        shelfMode = false;
-        el.toggleShelfBtn.className = "bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200";
-    }
-}
-
-function showToast(msg, isError = false) {
-    const existing = document.getElementById("toast-notif");
-    if(existing) existing.remove();
-
-    const t = document.createElement("div");
-    t.id = "toast-notif";
-    t.className = "fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full text-white font-bold z-[100] shadow-xl flex items-center gap-2 transition-all transform translate-y-10 opacity-0 " + (isError ? 'bg-red-500' : 'bg-slate-800');
-    t.innerHTML = '<span class="material-icons-round text-lg">' + (isError ? 'error_outline' : 'check_circle') + '</span><span>' + msg + '</span>';
-    
-    document.body.appendChild(t);
-    
-    requestAnimationFrame(() => {
-        t.classList.remove("translate-y-10", "opacity-0");
-    });
-    
-    setTimeout(() => {
-        t.classList.add("translate-y-10", "opacity-0");
-        setTimeout(() => t.remove(), 300);
-    }, 3000);
-}
+/* ISBN lookup */
+window.lookupISBN = async ()=>{
+  const i=isbn.value.replace(/\D/g,"");
+  let t="",a="",c="";
+  const r=await fetch(`https://api.openbd.jp/v1/get?isbn=${i}`);
+  const d=await r.json();
+  if(d[0]?.summary){
+    t=d[0].summary.title||"";
+    a=d[0].summary.author||"";
+    c=d[0].summary.cover||"";
+  }
+  if(!c){
+    const g=await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${i}`);
+    const gd=await g.json();
+    c=gd.items?.[0]?.volumeInfo?.imageLinks?.thumbnail||"";
+  }
+  if(c.startsWith("http://")) c=c.replace("http://","https://");
+  title.value=t; author.value=a; cover.value=c;
+  coverPreview.innerHTML=c
+    ? `<img src="${c}" class="h-full w-full object-contain">`
+    : "表紙なし";
+};
 </script>
 </body>
 </html>
