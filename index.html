@@ -50,12 +50,16 @@
             <span class="inline xs:hidden">蔵書</span>
         </h1>
         <div class="flex gap-2">
-            <button id="toggleShelfBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200">
+            <button id="toggleShelfBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200">
                 <span class="material-icons-round text-sm">fact_check</span>
                 <span class="hidden sm:inline">棚卸モード</span>
                 <span class="inline sm:hidden">棚卸</span>
             </button>
-            <button id="btnOpenModal" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 shadow-md hover:shadow-lg transition transform active:scale-95">
+            <button id="btnExportCsv" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200" title="CSV出力">
+                <span class="material-icons-round text-sm">file_download</span>
+                <span class="hidden sm:inline">CSV</span>
+            </button>
+            <button id="btnOpenModal" type="button" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 shadow-md hover:shadow-lg transition transform active:scale-95">
                 <span class="material-icons-round text-sm">add</span> 登録
             </button>
         </div>
@@ -105,6 +109,7 @@
             </button>
         </div>
 
+        <!-- 1. スキャナー画面 -->
         <div id="scannerSection" class="hidden mb-4 relative shrink-0">
             <div class="bg-black rounded-xl overflow-hidden relative shadow-inner">
                 <div id="interactive"></div>
@@ -118,6 +123,22 @@
             </button>
         </div>
 
+        <!-- 2. 確認画面 (New) -->
+        <div id="confirmSection" class="hidden flex-col gap-4 text-center py-4">
+            <div class="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-sm text-left">
+                <p class="font-bold flex items-center gap-2 mb-2 text-amber-600">
+                    <span class="material-icons-round">warning</span> 注意
+                </p>
+                <p>棚卸モードを開始すると、現在登録されている<span class="font-bold">すべての書籍の「最終棚卸日」がリセット（未実施）</span>されます。</p>
+                <p class="mt-2 text-xs opacity-80">※この操作は取り消せません。</p>
+            </div>
+            <div class="flex gap-3 mt-2">
+                <button id="btnCancelConfirm" class="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-600 p-3 rounded-lg font-bold text-sm transition">キャンセル</button>
+                <button id="btnStartShelfMode" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-lg font-bold text-sm shadow-lg shadow-slate-200 transition">開始する</button>
+            </div>
+        </div>
+
+        <!-- 3. 入力フォーム -->
         <div id="formFields" class="flex-1 overflow-y-auto pr-1">
             <button id="btnScan" class="w-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl p-4 mb-6 flex flex-col justify-center items-center gap-1 transition group">
                 <span class="material-icons-round text-2xl group-hover:scale-110 transition-transform text-slate-500">qr_code_scanner</span>
@@ -174,7 +195,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyChSeXTRYpykQkMmcDj041nlq-Nkt03oC4",
@@ -209,30 +230,38 @@ const el = {
     preview: document.getElementById("coverPreview"),
     modalTitle: document.getElementById("modalTitle"),
     formFields: document.getElementById("formFields"),
+    confirmSection: document.getElementById("confirmSection"),
     scannerSection: document.getElementById("scannerSection"),
     btnSave: document.getElementById("btnSave"),
     btnLookup: document.getElementById("btnLookup"),
     lookupText: document.getElementById("lookupText"),
     lookupLoader: document.getElementById("lookupLoader"),
     toggleShelfBtn: document.getElementById("toggleShelfBtn"),
+    btnExportCsv: document.getElementById("btnExportCsv"),
     btnOpenModal: document.getElementById("btnOpenModal"),
     btnEmptyAdd: document.getElementById("btnEmptyAdd"),
     btnCloseModal: document.getElementById("btnCloseModal"),
     btnCancel: document.getElementById("btnCancel"),
+    btnCancelConfirm: document.getElementById("btnCancelConfirm"),
+    btnStartShelfMode: document.getElementById("btnStartShelfMode"),
     btnScan: document.getElementById("btnScan"),
     btnStopScan: document.getElementById("btnStopScan")
 };
 
-// Event Listeners
-el.toggleShelfBtn.onclick = toggleShelfMode;
-el.btnOpenModal.onclick = openModal;
-el.btnEmptyAdd.onclick = openModal;
-el.btnCloseModal.onclick = closeModal;
-el.btnCancel.onclick = closeModal;
-el.btnSave.onclick = saveBook;
-el.btnLookup.onclick = lookupISBN;
-el.btnScan.onclick = startScanner;
-el.btnStopScan.onclick = stopScanner;
+// Event Listeners (using addEventListener for robustness)
+if (el.toggleShelfBtn) el.toggleShelfBtn.addEventListener('click', toggleShelfMode);
+if (el.btnExportCsv) el.btnExportCsv.addEventListener('click', exportToCsv);
+if (el.btnOpenModal) el.btnOpenModal.addEventListener('click', openModal);
+if (el.btnEmptyAdd) el.btnEmptyAdd.addEventListener('click', openModal);
+if (el.btnCloseModal) el.btnCloseModal.addEventListener('click', closeModal);
+if (el.btnCancel) el.btnCancel.addEventListener('click', closeModal);
+if (el.btnCancelConfirm) el.btnCancelConfirm.addEventListener('click', closeModal);
+if (el.btnStartShelfMode) el.btnStartShelfMode.addEventListener('click', executeShelfModeReset);
+if (el.btnSave) el.btnSave.addEventListener('click', saveBook);
+if (el.btnLookup) el.btnLookup.addEventListener('click', lookupISBN);
+if (el.btnScan) el.btnScan.addEventListener('click', startScanner);
+if (el.btnStopScan) el.btnStopScan.addEventListener('click', stopScanner);
+
 el.searchTitle.oninput = applySearch;
 el.searchMc.oninput = applySearch;
 
@@ -250,6 +279,58 @@ function init() {
     });
 }
 init();
+
+// ------------------------------------------------------------
+// CSV Export Function
+// ------------------------------------------------------------
+function exportToCsv() {
+    if (allBooks.length === 0) {
+        showToast("出力するデータがありません", true);
+        return;
+    }
+
+    const header = ["管理番号", "タイトル", "著者名", "ISBN", "最終棚卸日", "登録日"];
+    
+    const rows = allBooks.map(b => {
+        const formatDate = (ts) => {
+            if (!ts) return "";
+            try {
+                const d = ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000);
+                return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+            } catch(e) { return ""; }
+        };
+
+        return [
+            b.mcNumber || "",
+            b.title || "",
+            b.author || "",
+            b.isbn || "",
+            formatDate(b.lastChecked),
+            formatDate(b.createdAt)
+        ].map(field => {
+            const str = String(field);
+            if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        });
+    });
+
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const csvContent = [header, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([bom, csvContent], { type: "text/csv" });
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `books_export_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast("CSVを出力しました");
+}
 
 function applySearch() {
     const termT = el.searchTitle.value.toLowerCase();
@@ -364,7 +445,7 @@ function render(list) {
 }
 
 // ------------------------------------------------------------
-// 画像取得ロジック（シンプル版 - 元のコードと同等）
+// 画像取得ロジック
 // ------------------------------------------------------------
 async function lookupISBN() {
     const code = el.isbn.value.replace(/\D/g, "");
@@ -465,12 +546,15 @@ function updateCoverPreview(url) {
 function openModal() {
     editingId = null;
     shelfMode = false;
+    updateShelfModeUI();
     el.modalTitle.innerHTML = '<span class="material-icons-round text-slate-500 mr-2">add_circle</span>書籍登録';
     el.isbn.value = ""; el.mc.value = ""; el.title.value = ""; el.author.value = ""; el.cover.value = "";
     updateCoverPreview("");
     
+    // View Switch
     el.formFields.classList.remove("hidden");
     el.scannerSection.classList.add("hidden");
+    el.confirmSection.classList.add("hidden");
     
     el.modal.classList.remove("hidden");
     requestAnimationFrame(() => {
@@ -493,6 +577,7 @@ function editBook(id) {
     if (!b) return;
     editingId = id;
     shelfMode = false;
+    updateShelfModeUI();
     el.modalTitle.innerHTML = '<span class="material-icons-round text-slate-500 mr-2">edit</span>書籍編集';
     el.isbn.value = b.isbn || "";
     el.mc.value = b.mcNumber || "";
@@ -501,8 +586,10 @@ function editBook(id) {
     el.cover.value = b.cover || "";
     updateCoverPreview(b.cover);
     
+    // View Switch
     el.formFields.classList.remove("hidden");
     el.scannerSection.classList.add("hidden");
+    el.confirmSection.classList.add("hidden");
     
     el.modal.classList.remove("hidden");
     requestAnimationFrame(() => {
@@ -567,29 +654,92 @@ async function deleteBook(id) {
     }
 }
 
+// ------------------------------------------------------------
+// Shelf Mode & Reset Logic (Replaced standard confirm with Modal)
+// ------------------------------------------------------------
 function toggleShelfMode() {
-    shelfMode = !shelfMode;
-    
-    if (shelfMode) {
-        el.toggleShelfBtn.className = "bg-green-100 text-green-700 border-green-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border";
-        el.modalTitle.innerHTML = '<span class="material-icons-round text-green-500 mr-2">fact_check</span>棚卸スキャン中';
-        el.formFields.classList.add("hidden");
+    // If currently OFF -> Ask to Turn ON (Show Confirm Modal)
+    if (!shelfMode) {
+        el.modalTitle.innerHTML = '<span class="material-icons-round text-amber-500 mr-2">warning</span>棚卸モード開始';
         
+        // View Switch
+        el.formFields.classList.add("hidden");
+        el.scannerSection.classList.add("hidden");
+        el.confirmSection.classList.remove("hidden");
+        el.confirmSection.classList.add("flex");
+
+        // Show Modal
         el.modal.classList.remove("hidden");
         requestAnimationFrame(() => {
             el.modal.classList.remove("opacity-0");
             el.modal.classList.add("flex");
         });
-        startScanner();
     } else {
-        el.toggleShelfBtn.className = "bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200";
+        // If currently ON -> Turn OFF immediately
+        shelfMode = false;
+        updateShelfModeUI();
         closeModal();
     }
 }
 
+async function executeShelfModeReset() {
+    // User clicked "Start" in the modal
+    shelfMode = true;
+    updateShelfModeUI();
+    
+    // UI Update to "Loading"
+    el.modalTitle.innerHTML = '<span class="material-icons-round text-green-500 mr-2">hourglass_top</span>データリセット中...';
+    el.confirmSection.classList.add("hidden"); // Hide confirm
+    el.confirmSection.classList.remove("flex");
+    
+    // Execute Batch Reset
+    try {
+        if (allBooks.length > 0) {
+            // Split into chunks of 500 (Firestore limit)
+            const chunked = [];
+            for (let i = 0; i < allBooks.length; i += 500) {
+                chunked.push(allBooks.slice(i, i + 500));
+            }
+
+            for (const chunk of chunked) {
+                const batch = writeBatch(db);
+                chunk.forEach(b => {
+                    const ref = doc(db, COLLECTION_NAME, b.id);
+                    batch.update(ref, { lastChecked: null });
+                });
+                await batch.commit();
+            }
+        }
+
+        showToast("棚卸データをリセットしました");
+        
+        // Start Scanner
+        el.modalTitle.innerHTML = '<span class="material-icons-round text-green-500 mr-2">fact_check</span>棚卸スキャン中';
+        startScanner();
+
+    } catch (e) {
+        console.error("Reset Error:", e);
+        alert("データのリセットに失敗しました:\n" + e.message);
+        // Fallback
+        shelfMode = false;
+        updateShelfModeUI();
+        closeModal();
+    }
+}
+
+function updateShelfModeUI() {
+    if (shelfMode) {
+        el.toggleShelfBtn.className = "bg-green-100 text-green-700 border-green-200 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border";
+    } else {
+        el.toggleShelfBtn.className = "bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200";
+    }
+}
+
 function startScanner() {
+    // View Switch
     el.scannerSection.classList.remove("hidden");
-    if (!shelfMode) el.formFields.classList.add("hidden");
+    el.formFields.classList.add("hidden");
+    el.confirmSection.classList.add("hidden");
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         Quagga.init({
@@ -672,11 +822,14 @@ function stopScanner() {
         isScanning = false; 
     }
     el.scannerSection.classList.add("hidden");
-    el.formFields.classList.remove("hidden");
     
-    if (shelfMode) {
+    // モーダルが閉じられるときに呼ばれる場合と、スキャン完了で呼ばれる場合がある
+    if (!shelfMode) {
+         el.formFields.classList.remove("hidden");
+    } else {
+        // 棚卸モードOFF時に呼ばれた場合、ボタンUIを戻す
         shelfMode = false;
-        el.toggleShelfBtn.className = "bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition border border-slate-200";
+        updateShelfModeUI();
     }
 }
 
