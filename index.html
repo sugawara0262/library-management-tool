@@ -306,7 +306,6 @@ function render(list) {
             img.loading = "lazy";
             img.referrerPolicy = "no-referrer";
             img.onerror = function() { 
-                // Fallback to text icon if image fails
                 if(this.parentElement) {
                     this.parentElement.innerHTML = '<span class="material-icons-round text-4xl text-slate-200">auto_stories</span>';
                 }
@@ -366,9 +365,18 @@ function render(list) {
 
 function toHttps(url) {
     if (!url) return "";
-    return url.replace(/^http:\/\//i, 'https://');
+    let fixed = url.replace(/^http:\/\//i, 'https://');
+    if (fixed.includes("books.google.com")) {
+        try {
+            const urlObj = new URL(fixed);
+            urlObj.searchParams.delete('edge');
+            fixed = urlObj.toString();
+        } catch(e) {}
+    }
+    return fixed;
 }
 
+// 複数の画像候補を保持して、表示できるまで試すロジック
 async function lookupISBN() {
     const code = el.isbn.value.replace(/\D/g, "");
     if (code.length !== 13 && code.length !== 10) return showToast("ISBNは10桁または13桁で入力してください", true);
@@ -379,45 +387,60 @@ async function lookupISBN() {
     el.preview.innerHTML = '<div class="loader border-slate-300 border-t-slate-500"></div>';
 
     try {
-        let title = "", author = "", cover = "";
+        let title = "", author = "";
+        let candidates = []; // 画像URLの候補リスト
         
-        // 1. OpenBD
+        // 1. OpenBD (高画質・国内向け)
         try {
             const openbdRes = await fetch("https://api.openbd.jp/v1/get?isbn=" + code).then(r => r.json());
             if (openbdRes && openbdRes[0] && openbdRes[0].summary) {
                 const s = openbdRes[0].summary;
                 title = s.title;
                 author = s.author;
-                if (s.cover) cover = toHttps(s.cover);
+                if (s.cover) {
+                     // OpenBDの画像があれば最優先候補
+                     candidates.push(toHttps(s.cover));
+                }
             }
         } catch(e) { console.warn("OpenBD fail", e); }
 
-        // 2. Google Books
+        // 2. Google Books (網羅性高い)
         try {
             const googleRes = await fetch("https://www.googleapis.com/books/v1/volumes?q=isbn:" + code).then(r => r.json());
+            
             if (googleRes.items && googleRes.items[0]) {
                 const info = googleRes.items[0].volumeInfo;
                 if (!title) {
                     title = info.title || "";
                     author = info.authors?.join(", ") || "";
                 }
-                if (!cover && info.imageLinks) {
-                    const links = info.imageLinks;
-                    cover = toHttps(links.thumbnail || links.smallThumbnail);
+                
+                // 画像候補を追加
+                if (info.imageLinks) {
+                    if (info.imageLinks.thumbnail) candidates.push(toHttps(info.imageLinks.thumbnail));
+                    if (info.imageLinks.smallThumbnail) candidates.push(toHttps(info.imageLinks.smallThumbnail));
+                }
+                
+                // IDからの強制生成URLも候補に追加 (フォールバックとして強力)
+                if (googleRes.items[0].id) {
+                    const fallbackUrl = "https://books.google.com/books/content?id=" + googleRes.items[0].id + "&printsec=frontcover&img=1&zoom=1&source=gbs_api";
+                    candidates.push(fallbackUrl);
                 }
             }
         } catch(e) { console.warn("Google Books fail", e); }
 
-        // 3. Open Library Fallback
-        if (!cover) {
-            cover = "https://covers.openlibrary.org/b/isbn/" + code + "-M.jpg?default=false";
-        }
+        // 3. Open Library (最後の砦)
+        // MサイズとLサイズを候補に入れる
+        candidates.push("https://covers.openlibrary.org/b/isbn/" + code + "-L.jpg?default=false");
+        candidates.push("https://covers.openlibrary.org/b/isbn/" + code + "-M.jpg?default=false");
 
         if (title) {
             el.title.value = title;
             el.author.value = author;
-            el.cover.value = cover;
-            updateCoverPreview(cover);
+            
+            // 候補リストを渡して、表示できるものを探す
+            tryLoadImage(candidates, 0);
+            
             showToast("書籍情報が見つかりました");
         } else {
             throw new Error("NOT_FOUND");
@@ -432,6 +455,42 @@ async function lookupISBN() {
     }
 }
 
+// 再帰的に画像を試す関数
+function tryLoadImage(candidates, index) {
+    if (index >= candidates.length) {
+        // 全滅した場合
+        el.cover.value = ""; // DB保存用も空にする
+        el.preview.innerHTML = '<div class="flex flex-col items-center justify-center p-4 text-center h-full"><span class="material-icons-round text-4xl text-slate-200">image_not_supported</span><span class="text-xs text-slate-400 mt-2">画像なし</span></div>';
+        return;
+    }
+
+    const url = candidates[index];
+    
+    // 画像を仮読み込みしてチェック
+    const img = new Image();
+    img.src = url;
+    img.referrerPolicy = "no-referrer";
+    
+    img.onload = function() {
+        // 成功したら採用
+        el.cover.value = url;
+        
+        // プレビュー表示
+        el.preview.innerHTML = "";
+        const displayImg = document.createElement("img");
+        displayImg.src = url;
+        displayImg.className = "h-full w-full object-contain";
+        displayImg.referrerPolicy = "no-referrer";
+        el.preview.appendChild(displayImg);
+    };
+    
+    img.onerror = function() {
+        // 失敗したら次を試す
+        tryLoadImage(candidates, index + 1);
+    };
+}
+
+// 手動編集やDB読み込み時のプレビュー用
 function updateCoverPreview(url) {
     el.preview.innerHTML = "";
     if (url) {
